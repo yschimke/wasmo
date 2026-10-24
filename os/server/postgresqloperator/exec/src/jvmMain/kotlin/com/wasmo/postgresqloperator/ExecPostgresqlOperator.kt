@@ -50,6 +50,7 @@ internal class ExecPostgresqlOperator(
     }
 
     if (empty) {
+      prepareDataDirectory()
       gosuInitdb()
     }
 
@@ -59,6 +60,39 @@ internal class ExecPostgresqlOperator(
 
     if (empty) {
       initializer.initialize()
+    }
+  }
+
+  // A fresh Docker volume at /wasmo is owned root:root, so the unprivileged `postgres` user that
+  // initdb runs as (via gosu) cannot create its data directory under it. We are still root here
+  // (gosu drops privileges only for initdb and postgres themselves), so create /wasmo/postgresql
+  // and hand it to postgres first; initdb then creates /wasmo/postgresql/18 inside it.
+  private suspend fun prepareDataDirectory() {
+    coroutineScope {
+      val process = ProcessBuilder()
+        .command(
+          "/bin/sh",
+          "-c",
+          "mkdir -p /wasmo/postgresql && " +
+            "chown postgres:postgres /wasmo/postgresql && " +
+            "chmod 700 /wasmo/postgresql",
+        )
+        .start()
+
+      coroutineContext.job.invokeOnCompletion {
+        process.destroy()
+      }
+
+      collectStream("initdb-prepare", Stream.Stdout, process)
+      collectStream("initdb-prepare", Stream.Stderr, process)
+
+      val exitCode = nameThread("initdb-prepare.join") {
+        process.waitFor()
+      }
+
+      check(exitCode == 0 || coroutineContext.job.isCancelled) {
+        "preparing /wasmo/postgresql failed: $exitCode"
+      }
     }
   }
 
