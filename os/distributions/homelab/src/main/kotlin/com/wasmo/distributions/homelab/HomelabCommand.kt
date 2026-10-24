@@ -8,6 +8,7 @@ import com.wasmo.accounts.SessionCookieSpec
 import com.wasmo.common.catalog.DevelopmentCatalog
 import com.wasmo.events.LoggingEventListener
 import com.wasmo.framework.registerTopPrivateDomain
+import com.wasmo.identifiers.AccountPassword
 import com.wasmo.identifiers.Deployment
 import com.wasmo.identifiers.DistributionShortCode
 import com.wasmo.identifiers.HashingPepper
@@ -60,6 +61,10 @@ class HomelabCommand : CliktCommand() {
     // Teach URL decoding this deployment's root host, so <computer>.<host> and
     // <app>-<computer>.<host> requests decode their subdomain instead of 500ing on a custom domain.
     registerTopPrivateDomain(baseUrl.host)
+
+    // Optional: set a password on the bootstrapped (passwordless) admin account, so a homelab
+    // exposed on a public domain isn't open to anyone signing in as admin.
+    val adminPassword = System.getenv("WASMO_ADMIN_PASSWORD")?.takeIf { it.isNotBlank() }
 
     val deployment = Deployment(
       baseUrl = baseUrl,
@@ -116,6 +121,10 @@ class HomelabCommand : CliktCommand() {
     println("DebugProbes.enableCreationStackTraces: ${DebugProbes.enableCreationStackTraces}")
     println("${kotlinx.coroutines.DEBUG_PROPERTY_NAME}: ${System.getProperty(kotlinx.coroutines.DEBUG_PROPERTY_NAME)}")
 
+    // Captured from createService so the admin-password step below can run after startup (and so
+    // after migrations, which create the admin account).
+    var homelabGraph: HomelabGraph? = null
+
     val distribution = object : Distribution() {
       override val postgresqlConfig = postgresqlConfig
       override val ktorConfig = ktorConfig
@@ -157,12 +166,18 @@ class HomelabCommand : CliktCommand() {
               ).decodeHex()
           )
         )
+        homelabGraph = serviceGraph
         return serviceGraph.wasmoService
       }
     }
 
     coroutineScope {
       distribution.start()
+
+      // start() has returned, so migrations have run and the admin account exists.
+      if (adminPassword != null) {
+        homelabGraph?.adminPasswordInitializer?.ensureAdminPassword(AccountPassword(adminPassword))
+      }
     }
   }
 }

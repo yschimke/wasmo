@@ -14,6 +14,13 @@ particular deployment — the public URL, secrets and DNS name are all supplied 
   unchanged, so this is correct behind a TLS-terminating reverse proxy.
 - **`.wasm` content type** — static `.wasm` resources are served as `application/wasm`, which
   browsers require for `WebAssembly.instantiateStreaming`. (Also proposed upstream.)
+- **Custom-domain routing** — URL decoding derives the deployment's root host from `WASMO_BASE_URL`
+  (server) and `routing_context.rootUrl` (browser) instead of a hardcoded `wasmo.com`/`.dev`/
+  `.localhost` list, so `<computer>.<host>` and `<app>-<computer>.<host>` resolve on any domain.
+  Without it a subdomain deployment renders computer pages blank and 500s on installed-app hosts.
+- **`WASMO_ADMIN_PASSWORD`** (optional) — sets a password on the bootstrapped, otherwise
+  passwordless `admin` account at startup, if it has none yet. Set it on any homelab reachable off
+  localhost, or anyone can sign in as `admin`. Idempotent: it never overwrites an existing password.
 
 Keep this list small and the edits minimal: every patch is a potential merge conflict when the
 branch re-syncs.
@@ -41,6 +48,7 @@ Both are built for `linux/amd64,linux/arm64` by default.
 docker run \
   --env WASMO_BASE_URL=https://wasmo.example.com/ \
   --env WASMO_PASSWORD_PEPPER=<hex> \
+  --env WASMO_ADMIN_PASSWORD=<admin-password> \
   --publish 54400:54400 \
   --mount type=bind,src=$HOME/.wasmo/homelab,dst=/wasmo \
   ghcr.io/<owner>/wasmo-homelab:latest

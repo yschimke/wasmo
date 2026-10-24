@@ -71,6 +71,7 @@ import wasmo.sql.SqlDatabase
 )
 internal interface HomelabGraph {
   val wasmoService: WasmoService
+  val adminPasswordInitializer: AdminPasswordInitializer
   val callGraphFactory: CallGraph.Factory
   val computerServiceGraphFactory: ComputerServiceGraph.Factory
   val installedAppServiceGraphFactory: InstalledAppServiceGraph.Factory
