@@ -22,5 +22,11 @@ kotlin {
         implementation(projects.wasmo.os.json)
       }
     }
+    val jvmTest by getting {
+      dependencies {
+        implementation(libs.kotlin.test)
+        implementation(libs.assertk)
+      }
+    }
   }
 }
