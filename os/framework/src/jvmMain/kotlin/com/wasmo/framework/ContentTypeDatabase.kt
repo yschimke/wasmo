@@ -82,6 +82,7 @@ private object MdnContentTypeDatabase : ContentTypeDatabase {
     "ttf" to "font/ttf".toMediaType(),
     "txt" to "text/plain".toMediaType(),
     "vsd" to "application/vnd.visio".toMediaType(),
+    "wasm" to "application/wasm".toMediaType(),
     "wav" to "audio/wav".toMediaType(),
     "weba" to "audio/webm".toMediaType(),
     "webm" to "video/webm".toMediaType(),

@@ -12,6 +12,7 @@ class ContentTypeDatabaseTest {
     assertThat(ContentTypeDatabase.MDN["logo.png"]).isEqualTo("image/png".toMediaType())
     assertThat(ContentTypeDatabase.MDN["logo.PNG"]).isEqualTo("image/png".toMediaType())
     assertThat(ContentTypeDatabase.MDN["logo.zip.png"]).isEqualTo("image/png".toMediaType())
+    assertThat(ContentTypeDatabase.MDN["app.wasm"]).isEqualTo("application/wasm".toMediaType())
     assertThat(ContentTypeDatabase.MDN["logo.ping"]).isNull()
     assertThat(ContentTypeDatabase.MDN["logo"]).isNull()
   }
