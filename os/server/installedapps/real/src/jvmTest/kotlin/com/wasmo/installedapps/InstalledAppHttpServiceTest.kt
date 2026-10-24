@@ -14,10 +14,17 @@ import kotlinx.coroutines.test.runTest
 import okhttp3.MediaType.Companion.toMediaType
 import okio.ByteString.Companion.encodeUtf8
 import wasmo.objectstore.PutObjectRequest
+import wit.wasmo.http.v0_1_0.Header
 
 class InstalledAppHttpServiceTest {
   @InterceptTest
   val tester = ServiceTester()
+
+  // The headers a static response carries: a strong ETag (SHA-256 of the body) and Cache-Control.
+  private fun cacheHeaders(body: String) = listOf(
+    Header("ETag", "\"${body.encodeUtf8().sha256().hex()}\""),
+    Header("Cache-Control", "no-cache"),
+  )
 
   @Test
   fun resourceInWww() = runTest {
@@ -35,6 +42,7 @@ class InstalledAppHttpServiceTest {
     assertThat(owner.call().callApp(url = installedApp.url.resolve("/resource1.txt")!!))
       .isEqualTo(
         Response(
+          headers = cacheHeaders("This is a resource in www"),
           contentType = "text/plain".toMediaType(),
           body = ResponseBodySnapshot("This is a resource in www"),
         ),
@@ -62,6 +70,7 @@ class InstalledAppHttpServiceTest {
     assertThat(owner.call().callApp(url = installedApp.url.resolve("/resource1.txt")!!))
       .isEqualTo(
         Response(
+          headers = cacheHeaders("This is a resource in www-public"),
           contentType = "text/plain".toMediaType(),
           body = ResponseBodySnapshot("This is a resource in www-public"),
         ),
@@ -71,6 +80,7 @@ class InstalledAppHttpServiceTest {
     assertThat(anotherUser.call().callApp(url = installedApp.url.resolve("/resource1.txt")!!))
       .isEqualTo(
         Response(
+          headers = cacheHeaders("This is a resource in www-public"),
           contentType = "text/plain".toMediaType(),
           body = ResponseBodySnapshot("This is a resource in www-public"),
         ),
@@ -94,6 +104,7 @@ class InstalledAppHttpServiceTest {
     assertThat(installedApp.call("/resource1.txt"))
       .isEqualTo(
         Response(
+          headers = cacheHeaders("This is a resource in www-public"),
           contentType = "text/plain".toMediaType(),
           body = ResponseBodySnapshot("This is a resource in www-public"),
         ),
@@ -121,6 +132,7 @@ class InstalledAppHttpServiceTest {
     assertThat(owner.call().callApp(url = installedApp.url.resolve("/resource1.txt")!!))
       .isEqualTo(
         Response(
+          headers = cacheHeaders("This is an object in www"),
           contentType = "text/sample".toMediaType(),
           body = ResponseBodySnapshot("This is an object in www"),
         ),
@@ -153,6 +165,7 @@ class InstalledAppHttpServiceTest {
     assertThat(owner.call().callApp(url = installedApp.url.resolve("/resource1.txt")!!))
       .isEqualTo(
         Response(
+          headers = cacheHeaders("This is an object in www-public"),
           contentType = "text/sample".toMediaType(),
           body = ResponseBodySnapshot("This is an object in www-public"),
         ),
@@ -162,6 +175,7 @@ class InstalledAppHttpServiceTest {
     assertThat(anotherUser.call().callApp(url = installedApp.url.resolve("/resource1.txt")!!))
       .isEqualTo(
         Response(
+          headers = cacheHeaders("This is an object in www-public"),
           contentType = "text/sample".toMediaType(),
           body = ResponseBodySnapshot("This is an object in www-public"),
         ),
@@ -196,6 +210,7 @@ class InstalledAppHttpServiceTest {
     assertThat(installedApp.call("/resource1.txt"))
       .isEqualTo(
         Response(
+          headers = cacheHeaders("This is an object in www-public"),
           contentType = "text/sample".toMediaType(),
           body = ResponseBodySnapshot("This is an object in www-public"),
         ),
@@ -227,6 +242,7 @@ class InstalledAppHttpServiceTest {
     assertThat(installedApp.call("/resource1.txt"))
       .isEqualTo(
         Response(
+          headers = cacheHeaders("This is an object in www"),
           contentType = "text/simple".toMediaType(),
           body = ResponseBodySnapshot("This is an object in www"),
         ),
@@ -250,6 +266,7 @@ class InstalledAppHttpServiceTest {
     assertThat(installedApp.call("/"))
       .isEqualTo(
         Response(
+          headers = cacheHeaders("This is the default resource"),
           contentType = "text/html".toMediaType(),
           body = ResponseBodySnapshot("This is the default resource"),
         ),
@@ -258,6 +275,7 @@ class InstalledAppHttpServiceTest {
     assertThat(installedApp.call("/hello/"))
       .isEqualTo(
         Response(
+          headers = cacheHeaders("This is the default resource for hello/"),
           contentType = "text/html".toMediaType(),
           body = ResponseBodySnapshot("This is the default resource for hello/"),
         ),
@@ -280,5 +298,39 @@ class InstalledAppHttpServiceTest {
     assertFailsWith<NotFoundUserException> {
       installedApp.call("/hello")
     }
+  }
+
+  @Test
+  fun conditionalGetReturnsNotModified() = runTest {
+    val app = tester.sampleApps.recipes.publishedApp.copy(
+      resources = tester.sampleApps.recipes.publishedApp.resources + mapOf(
+        "www-public/resource1.txt" to "This is a cacheable resource".encodeUtf8(),
+      ),
+    )
+    tester.publishApp(app)
+
+    val client = tester.newClient()
+    val computer = client.createComputer()
+    val installedApp = computer.installApp(app)
+    val url = installedApp.url.resolve("/resource1.txt")!!
+
+    // A first request returns the body with an ETag.
+    val first = client.call().callApp(url = url)
+    val etag = first.header("ETag")!!
+    assertThat(first.status).isEqualTo(200)
+
+    // A revalidation with the same ETag returns 304 with no body.
+    val second = client.call().callApp(
+      url = url,
+      headers = listOf(Header("If-None-Match", etag)),
+    )
+    assertThat(second).isEqualTo(
+      Response(
+        status = 304,
+        headers = cacheHeaders("This is a cacheable resource"),
+        contentType = "text/plain".toMediaType(),
+        body = ResponseBodySnapshot(""),
+      ),
+    )
   }
 }
