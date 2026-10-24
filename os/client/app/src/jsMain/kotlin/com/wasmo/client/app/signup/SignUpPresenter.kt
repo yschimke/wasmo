@@ -7,7 +7,6 @@ import com.wasmo.api.SignInSnapshot
 import com.wasmo.api.routes.HomeRoute
 import com.wasmo.client.app.data.AccountDataService
 import com.wasmo.client.app.routing.Router
-import com.wasmo.client.app.routing.TransitionDirection
 import com.wasmo.client.framework.Presenter
 import com.wasmo.identifiers.UsernameSlug
 import com.wasmo.identifiers.isUsernameValid
@@ -121,7 +120,7 @@ class SignUpPresenter(
               response.account?.let { accountSnapshot ->
                 accountDataService.receiveAccountSnapshot(accountSnapshot)
               }
-              router.goTo(HomeRoute, TransitionDirection.PUSH)
+              router.reload(HomeRoute)
             }
 
             Decision.BadRequest -> {
@@ -200,7 +199,7 @@ class SignUpPresenter(
               response.account?.let { accountSnapshot ->
                 accountDataService.receiveAccountSnapshot(accountSnapshot)
               }
-              router.goTo(HomeRoute, TransitionDirection.PUSH)
+              router.reload(HomeRoute)
             }
             else -> {
               // TODO: Update UI to show an error message
@@ -272,7 +271,7 @@ class SignUpPresenter(
         response.account?.let { accountSnapshot ->
           accountDataService.receiveAccountSnapshot(accountSnapshot)
         }
-        router.goTo(HomeRoute, TransitionDirection.PUSH)
+        router.reload(HomeRoute)
       }
     }
 

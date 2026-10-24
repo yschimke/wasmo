@@ -40,6 +40,20 @@ class Router(
   ) = goToRoute(route, transitionDirection)
 
   /**
+   * Force a full page load to [route], so the server re-renders pageData for this navigation
+   * instead of reusing the pageData the current page was served with.
+   *
+   * Needed after an in-page sign-in: the page was served signed out, so `document.pageData` carries
+   * no `computer_list_snapshot`. Routing to the home route in-app would construct `HomeUi` with that
+   * absent snapshot and crash in composition; a full load lets the server render the signed-in page
+   * with the snapshot present. This is the sign-in counterpart to how [SignOutRoute] already forces
+   * a load via [requiresBrowserNavigation].
+   */
+  fun reload(route: Route) {
+    browser.locationHref = routeCodec.encode(route).encode()
+  }
+
+  /**
    * @param transitionDirection null if the browser's forwards and backwards buttons triggered this
    *     navigation.
    */

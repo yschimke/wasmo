@@ -32,7 +32,9 @@ class CallAppAction(
   suspend fun call(request: Request): Response<ResponseBody> {
     val (httpService, caller) = wasmoDb.transaction {
       val routeCodec = callDataService.routeCodec()
-      val route = routeCodec.decode(request.url.toWasmoUrl()) as AppRoute
+      // A routing mismatch (e.g. a host that decodes to a non-app route) is a 404, not a 500.
+      val route = routeCodec.decode(request.url.toWasmoUrl()) as? AppRoute
+        ?: throw NotFoundUserException()
       installedAppStore.getHttpServiceAndAccessOrNull(
         client = client,
         computerSlug = route.computerSlug,

@@ -27,7 +27,7 @@ fun <T> DeserializationStrategy<T>.decode(request: RoutingRequest): T {
       return WasmoJson.decodeFromString(this@decode, source.readUtf8())
     }
   } catch (e: SerializationException) {
-    throw ArgumentUserException("failed to decode manifest\n\n${e.message}")
+    throw ArgumentUserException("failed to decode request\n\n${e.message}")
   }
 }
 

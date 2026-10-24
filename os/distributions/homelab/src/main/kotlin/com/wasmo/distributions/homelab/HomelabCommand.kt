@@ -7,6 +7,7 @@ import com.wasmo.accounts.CookieSecret
 import com.wasmo.accounts.SessionCookieSpec
 import com.wasmo.common.catalog.DevelopmentCatalog
 import com.wasmo.events.LoggingEventListener
+import com.wasmo.framework.registerTopPrivateDomain
 import com.wasmo.identifiers.Deployment
 import com.wasmo.identifiers.DistributionShortCode
 import com.wasmo.identifiers.HashingPepper
@@ -55,6 +56,10 @@ class HomelabCommand : CliktCommand() {
     var baseUrl =
       (System.getenv("WASMO_BASE_URL")?.takeIf { it.isNotBlank() } ?: "http://wasmo.localhost:8080/")
         .toHttpUrl()
+
+    // Teach URL decoding this deployment's root host, so <computer>.<host> and
+    // <app>-<computer>.<host> requests decode their subdomain instead of 500ing on a custom domain.
+    registerTopPrivateDomain(baseUrl.host)
 
     val deployment = Deployment(
       baseUrl = baseUrl,
