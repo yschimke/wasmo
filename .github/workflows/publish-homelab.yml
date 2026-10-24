@@ -51,7 +51,9 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: "21"
+          # 25, not 21: the build's brevity gradle plugin requires a JVM >= 25 to configure
+          # :platform:api, and the foundation image is temurin-25 too.
+          java-version: "25"
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
