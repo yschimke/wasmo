@@ -1,0 +1,64 @@
+# Keeps this fork's `deploy` branch current with upstream wasmcomputercompany/wasmo.
+#
+# `deploy` is upstream `main` plus this fork's small deployment patches (see DEPLOY.md). This job
+# merges upstream `main` into `deploy` on a schedule. A clean merge is pushed (which the image
+# publish workflow then picks up); a conflicting merge is aborted and an issue is opened so a human
+# resolves it, rather than pushing a broken tree.
+name: Sync upstream
+
+on:
+  schedule:
+    - cron: "17 6 * * *" # daily, 06:17 UTC
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency:
+  group: sync-upstream
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout deploy
+        uses: actions/checkout@v4
+        with:
+          ref: deploy
+          fetch-depth: 0
+
+      - name: Merge upstream main
+        id: merge
+        continue-on-error: true
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git remote add upstream https://github.com/wasmcomputercompany/wasmo
+          git fetch --no-tags upstream main
+          if git merge-base --is-ancestor upstream/main HEAD; then
+            echo "up-to-date; nothing to merge"
+            echo "merged=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git merge --no-edit upstream/main
+          echo "merged=true" >> "$GITHUB_OUTPUT"
+
+      - name: Push
+        if: steps.merge.outcome == 'success' && steps.merge.outputs.merged == 'true'
+        run: git push origin deploy
+
+      - name: Open an issue on conflict
+        if: steps.merge.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git merge --abort || true
+          title="Upstream sync needs manual merge ($(date -u +%Y-%m-%d))"
+          if gh issue list --state open --search "$title in:title" --json number --jq 'length' | grep -qx 0; then
+            gh issue create \
+              --title "$title" \
+              --body "The scheduled upstream merge into \`deploy\` hit a conflict and was aborted. Resolve it locally: \`git fetch upstream main && git checkout deploy && git merge upstream/main\`, then push. See DEPLOY.md."
+          fi
+          exit 1
