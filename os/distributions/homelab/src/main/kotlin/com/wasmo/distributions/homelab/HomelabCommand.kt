@@ -52,7 +52,9 @@ class HomelabCommand : CliktCommand() {
     // development host; a deployment behind a real domain sets WASMO_BASE_URL (e.g.
     // "https://wasmo.example.com/"). The internal listen port is configured separately below and
     // is unaffected, so this stays correct behind a TLS-terminating reverse proxy on 443.
-    var baseUrl = (System.getenv("WASMO_BASE_URL") ?: "http://wasmo.localhost:8080/").toHttpUrl()
+    var baseUrl =
+      (System.getenv("WASMO_BASE_URL")?.takeIf { it.isNotBlank() } ?: "http://wasmo.localhost:8080/")
+        .toHttpUrl()
 
     val deployment = Deployment(
       baseUrl = baseUrl,
