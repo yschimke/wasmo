@@ -42,6 +42,9 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: deploy
+          # os/client/style compiles SCSS that `@use "pico"` from the submodules/pico submodule;
+          # without this the Pico sources aren't on the Sass load path and compileScss fails.
+          submodules: recursive
 
       - name: Lowercase the owner for GHCR
         id: owner
