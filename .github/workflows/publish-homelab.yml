@@ -58,6 +58,14 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      # :platform:api's brevity plugin fetches its WIT with the `wkg` CLI (wasm-pkg-tools), which
+      # isn't on the runner. Install it the way docs/local_development/rust.md does; cargo and
+      # ~/.cargo/bin are already present and on PATH on ubuntu runners.
+      - name: Install wkg
+        run: |
+          cargo install wkg --locked
+          wkg --version
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
@@ -79,9 +87,11 @@ jobs:
           push: true
           tags: ghcr.io/${{ steps.owner.outputs.name }}/wasmo-homelab-foundation:latest
 
+      # --no-configuration-cache: Jib's BuildImageTask holds a Project reference and can't be stored
+      # in Gradle's configuration cache (on by default in gradle.properties), which fails the build.
       - name: Build and push the homelab image (Jib)
         run: |
-          ./gradlew :os:distributions:homelab:jib \
+          ./gradlew --no-configuration-cache :os:distributions:homelab:jib \
             -Djib.from.image=ghcr.io/${{ steps.owner.outputs.name }}/wasmo-homelab-foundation \
             -Djib.from.platforms=${{ env.PLATFORMS }} \
             -Djib.to.image=ghcr.io/${{ steps.owner.outputs.name }}/wasmo-homelab \
