@@ -121,6 +121,9 @@ class ZipResourceInstaller(
     try {
       zip.zipInputStream().use { zipInputStream ->
         for (zipEntry in zipInputStream.entries()) {
+          // Skip directory entries (e.g. "www/"). Writing them as objects creates a file at that
+          // path, so the real files beneath it ("www/app.wasm") then fail with "Not a directory".
+          if (zipEntry.isDirectory) continue
           val zipEntryName = zipEntry.name
           context(issueCollector.path(zipEntryName)) {
             copyZipEntryToObjectStore(zipInputStream, resourcesObjectStore, zipEntryName)

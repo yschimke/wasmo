@@ -4,6 +4,7 @@ import assertk.assertThat
 import assertk.assertions.containsExactly
 import assertk.assertions.isEmpty
 import assertk.assertions.isEqualTo
+import assertk.assertions.isNull
 import com.wasmo.identifiers.AppSlug
 import com.wasmo.identifiers.WasmoFileAddress
 import com.wasmo.packaging.AppManifest
@@ -18,6 +19,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.encodeToString
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okio.Buffer
+import okio.ByteString
 import okio.ByteString.Companion.encodeUtf8
 import okio.ByteString.Companion.toByteString
 import okio.IOException
@@ -59,6 +61,36 @@ class ZipResourceInstallerTest {
     assertThat(objectStore["music/resources/v1/wasmo-manifest.toml"])
       .isEqualTo(WasmoToml.encodeToString(manifest).encodeUtf8())
     assertThat(objectStore["music/resources/v1/assets/index.html"])
+      .isEqualTo("<title>Music!</title>".encodeUtf8())
+  }
+
+  @Test
+  fun skipsDirectoryEntries() = runTest {
+    val manifest = AppManifest(
+      version = 1L,
+      target = TargetSdk1,
+    )
+
+    // A .wasmo built by a generic zip tool (e.g. Gradle's Zip task) carries directory entries like
+    // "www/". These must be skipped: writing one as an object creates a file at that path, so the
+    // files beneath it ("www/index.html") then fail to store with "Not a directory".
+    val wasmoFile = buildZip {
+      put(manifest)
+      put("www/", ByteString.EMPTY)
+      put("www/index.html", "<title>Music!</title>".encodeUtf8())
+    }
+    httpService[url] = wasmoFile
+
+    val issueCollector = IssueCollector()
+    val installedManifest = with(issueCollector) {
+      installer.install()
+    }
+
+    assertThat(installedManifest).isEqualTo(manifest)
+    assertThat(issueCollector.issues).isEmpty()
+    // The directory entry is not stored as an object, so it cannot shadow the files beneath it.
+    assertThat(objectStore["music/resources/v1/www/"]).isNull()
+    assertThat(objectStore["music/resources/v1/www/index.html"])
       .isEqualTo("<title>Music!</title>".encodeUtf8())
   }
 
