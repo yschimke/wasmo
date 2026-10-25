@@ -26,7 +26,7 @@ import wasmox.sql.single
 import wasmox.sql.singleOrNull
 
 context(connection: SqlConnection)
-suspend fun insertInstalledApp(
+suspend fun insertOrUpdateInstalledApp(
   installedAt: Instant,
   computerId: ComputerId,
   slug: AppSlug,
@@ -51,7 +51,12 @@ suspend fun insertInstalledApp(
       $4,
       $5,
       $6
-    ) RETURNING id
+    )
+    ON CONFLICT (computer_id, slug, active) WHERE active IS NOT NULL
+    DO UPDATE SET
+      wasmo_file_address = EXCLUDED.wasmo_file_address,
+      version = InstalledApp.version + 1
+    RETURNING id
     """,
   ) {
     bindInstant(0, installedAt)
