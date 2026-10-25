@@ -167,7 +167,7 @@ class AppServicesAppTest {
     withApp { app, platform ->
       assertEquals(200U, app.request("kv").code)
       platform.sqlService.getOrCreate().newConnection().use {
-        it.execute("UPDATE wasmo_services_schema SET version = 2")
+        it.execute("UPDATE wasmo_services_schema SET version = 3")
       }
       assertEquals(503U, app.request("kv").code)
       assertEquals(503U, app.request("kv/key", "PUT", "true").code)

@@ -51,6 +51,7 @@ kotlin {
         implementation(projects.os.server.jobs.api)
         implementation(projects.os.server.objectstore.api)
         implementation(projects.os.server.objectstore.fs)
+        implementation(projects.os.server.okhttpclient)
         implementation(projects.os.server.passkeys.api)
         implementation(projects.os.server.passkeys.real)
         implementation(projects.os.server.passwords.api)

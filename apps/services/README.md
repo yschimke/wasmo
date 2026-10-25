@@ -1,6 +1,6 @@
 # Shared Wasmo app services: staged implementation
 
-This stage adds only the owner settings API from the [handover](https://github.com/yschimke/homeassistant-remotecompose/blob/e6f075be/docs/architecture/wasmo-cloud-backend.md).
+The settings stage adds the owner settings API from the [handover](https://github.com/yschimke/homeassistant-remotecompose/blob/e6f075be/docs/architecture/wasmo-cloud-backend.md).
 Each separately released static archive remains the source of browser assets. Nothing is deployed.
 The shared factory is registered for each allowlisted install name; there is no Terrazzo branch in
 server wiring or service code. Settings use the app's own per-install database, so neither another
@@ -18,7 +18,7 @@ not execution of an archive's `app.wasm`.
 All endpoints are under `/api/wasmo/v1/` and require the Wasmo owner session. The platform guards
 access before calling app code; the app must never add public objects over the API namespace.
 
-- `GET capabilities`: API 1, `kv: true`, `haSession: false`, `publish: false`.
+- `GET capabilities`: API 1, `kv: true`, `haSession` enabled only with private session configuration, `publish: false`.
 - `GET kv`: all saved JSON values, keyed by setting name.
 - `PUT kv/{key}`: any JSON value, including JSON null; requires `Content-Type: application/json`.
 - `DELETE kv/{key}`: idempotently removes a setting.
@@ -75,7 +75,7 @@ The generic KV API is last-writer-wins and clients seed once per page. Atomic im
 migration races; it does not merge concurrent usage ledgers or coordinate report idempotency.
 Those remain app-level design questions before claiming combined counts across active devices.
 
-HA credential custody and public publishing are disabled here. Before enabling them:
+HA credential custody is implemented in the separately enabled [private session stage](HA-SESSIONS.md). Public publishing is deferred by the owner and remains disabled. Before any future public stage:
 
 1. Choose the HA destination policy. Wasmo's shared OkHttp client follows redirects and has no
    destination allowlist; checking only the supplied URL does not constrain the final destination.
@@ -103,3 +103,5 @@ Tests use the repository's `FakePlatform` and `FakeSqlService`. They require loc
 `postgres` / `password`, optionally at `POSTGRESQL_HOSTNAME` (see the local development runbook).
 They exercise lazy schema migration, persistence, CSRF, malformed input, byte and aggregate limits,
 newer-schema refusal and disabled credential/publication capabilities.
+
+The owner selected owner-supplied public HTTPS HA origins. See [HA-SESSIONS.md](HA-SESSIONS.md) for the optional session API, outbound safeguards, encryption and rollout limits. No public card data is exposed.

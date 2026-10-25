@@ -81,12 +81,13 @@ abstract class ServiceBindings {
     @Provides
     @SingleIn(OsScope::class)
     fun provideWasmoAppFactories(): Map<AppSlug, WasmoApp.Factory> = buildMap {
+      val sessionKeys = ee.schimke.wasmo.services.SessionKeys.parse(System.getenv("WASMO_SESSION_KEYS"))
       put(AppSlug("journal"), JournalWasmoApp.Factory())
       // Temporary JVM simulation until the platform can load third-party app components.
       for (name in serviceApps(System.getenv("WASMO_SERVICE_APPS"))) {
         val slug = AppSlug(name)
         require(slug !in this) { "App services cannot replace an existing built-in app: $slug" }
-        put(slug, AppServicesApp.Factory())
+        put(slug, AppServicesApp.Factory(sessionKeys))
       }
     }
 

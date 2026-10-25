@@ -33,6 +33,7 @@ kotlin {
         implementation(projects.os.server.identifiers)
         implementation(projects.os.server.installedapps.api)
         implementation(projects.os.server.jobs.api)
+        implementation(projects.os.server.okhttpclient)
         implementation(projects.os.server.payments.api)
         implementation(projects.os.server.sql.api)
         implementation(projects.os.server.wasm.api)

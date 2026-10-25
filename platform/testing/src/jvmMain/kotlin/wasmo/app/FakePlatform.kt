@@ -12,6 +12,8 @@ class FakePlatform(
 ) : Platform {
   override val clock = FakeClock()
   override val httpService = FakeHttpService()
+  override var publicHttpsService: wasmo.http.HttpService? = null
+  override var applicationUrl: String? = null
   override val objectStore = FakeObjectStore()
   override val downloader = RealDownloader(httpService, objectStore)
   override val jobQueueFactory = FakeJobQueueFactory()
