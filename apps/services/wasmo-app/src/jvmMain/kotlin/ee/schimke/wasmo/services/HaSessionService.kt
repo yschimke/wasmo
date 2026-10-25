@@ -119,7 +119,14 @@ internal class HaSessionService(
         )
       }
       route == "ha/session" && request.method == "DELETE" -> {
-        if (input.string("sessionId") != row.id) throw Failure(409U, "session-changed")
+        val expected = input.string("sessionId")
+        // An acknowledged response may be lost. Retrying a completed removal is safe, while
+        // an old device must never remove a different active session.
+        if (current == null) {
+          if (!row.initialized) save(connection, UUID.randomUUID().toString(), null)
+          return@transaction json(buildJsonObject { put("signedIn", false) })
+        }
+        if (expected != row.id) throw Failure(409U, "session-changed")
         if (current != null) {
           var response =
             http.execute(

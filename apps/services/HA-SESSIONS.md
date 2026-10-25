@@ -43,7 +43,8 @@ Schema 2 adds a singleton session row beside the existing KV table. A transactio
 refresh, replacement, migration and sign-out across app recreation/processes. Concurrent refreshes
 reuse a valid cached access token. Invalid refresh grants clear custody. A generation changes on
 replacement/removal: stale devices cannot refresh or remove a newer session. A permanent import
-tombstone prevents old browser credentials from restoring a signed-out session. Replacing a
+tombstone prevents old browser credentials from restoring a signed-out session. Retrying a removal
+after a lost response succeeds when no session remains; it cannot remove a different active session. Replacing a
 session forgets its previous grant; owners can revoke older grants from their HA profile.
 
 ## Public HTTPS boundary

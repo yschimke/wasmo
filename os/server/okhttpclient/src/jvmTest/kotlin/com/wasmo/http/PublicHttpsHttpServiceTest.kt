@@ -12,7 +12,6 @@ import okhttp3.Dns
 import okhttp3.Protocol
 import okhttp3.Request
 import okhttp3.Response
-import okhttp3.ResponseBody.Companion.toResponseBody
 import okio.IOException
 import wasmo.http.HttpRequest
 
@@ -66,7 +65,7 @@ class PublicHttpsHttpServiceTest {
   @Test
   fun checksEveryResolutionAndRejectsMixedAnswers() {
     var answer = listOf(InetAddress.getByName("8.8.8.8"))
-    val dns = PublicInternetDns(Dns { answer })
+    val dns = publicHttpsClient(Dns { answer }).dns
     assertEquals(answer, dns.lookup("ha.example.test"))
     answer = listOf(InetAddress.getByName("127.0.0.1"))
     assertFailsWith<UnknownHostException> { dns.lookup("ha.example.test") }
@@ -106,7 +105,17 @@ class PublicHttpsHttpServiceTest {
         .protocol(Protocol.HTTP_1_1)
         .code(200)
         .message("OK")
-        .body(text.toResponseBody())
+        .body(
+          object : okhttp3.ResponseBody() {
+            private val buffer = okio.Buffer().writeUtf8(text)
+
+            override fun contentType(): okhttp3.MediaType? = null
+
+            override fun contentLength() = -1L
+
+            override fun source() = buffer
+          }
+        )
         .build()
     response("small").use { assertEquals("small", it.toWasmo(10).body.utf8()) }
     response("x".repeat(11)).use { assertFailsWith<IOException> { it.toWasmo(10) } }
