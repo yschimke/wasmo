@@ -1,7 +1,7 @@
 package com.wasmo.computers
 
 import com.wasmo.api.ComputerSnapshot
-import com.wasmo.db.installedapps.insertInstalledApp
+import com.wasmo.db.installedapps.insertOrUpdateInstalledApp
 import com.wasmo.db.installedapps.selectInstalledAppsByComputerId
 import com.wasmo.identifiers.AppSlug
 import com.wasmo.identifiers.ComputerId
@@ -53,7 +53,7 @@ class RealComputerService(
     wasmoFileAddress: WasmoFileAddress,
     slug: AppSlug,
   ) {
-    val installedAppId = insertInstalledApp(
+    val installedAppId = insertOrUpdateInstalledApp(
       installedAt = clock.now(),
       computerId = id,
       slug = slug,

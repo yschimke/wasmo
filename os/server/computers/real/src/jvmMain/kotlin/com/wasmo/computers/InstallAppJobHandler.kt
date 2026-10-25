@@ -3,6 +3,7 @@ package com.wasmo.computers
 import com.wasmo.db.installedapps.DbInstalledAppRelease
 import com.wasmo.db.installedapps.insertInstalledAppRelease
 import com.wasmo.db.installedapps.selectInstalledAppById
+import com.wasmo.db.installedapps.selectInstalledAppReleaseById
 import com.wasmo.db.installedapps.setRelease
 import com.wasmo.events.EventListener
 import com.wasmo.identifiers.OsScope
@@ -71,7 +72,10 @@ class InstallAppJobHandler(
         installedAppRelease = installedAppRelease,
       )
 
-      service.app()?.afterInstall(0L, installedManifest.version)
+      val oldVersion = wasmoDb.transaction {
+        installedApp.activeReleaseId?.let { selectInstalledAppReleaseById(it)?.appVersion } ?: 0L
+      }
+      service.app()?.afterInstall(oldVersion, installedManifest.version)
 
       wasmoDb.transaction {
         val rowCount = setRelease(
