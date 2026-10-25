@@ -22,6 +22,11 @@ particular deployment — the public URL, secrets and DNS name are all supplied 
   passwordless `admin` account at startup, if it has none yet. Set it on any homelab reachable off
   localhost, or anyone can sign in as `admin`. Idempotent: it never overwrites an existing password.
 
+- **Simulated third-party apps (opt-in)** — `WASMO_SERVICE_APPS=terrazzo,notes,photos,tasks`
+  registers shared owner settings services for an operator-approved list of installed apps. The default is empty; other apps and deployments are unchanged.
+  This is a temporary bridge until Wasmo can execute third-party app components. See
+  [the staged implementation](apps/services/README.md). It does not package browser assets.
+
 Keep this list small and the edits minimal: every patch is a potential merge conflict when the
 branch re-syncs.
 
@@ -57,3 +62,16 @@ docker run \
 Put a TLS-terminating reverse proxy in front on 443, with a certificate for both the base host and a
 wildcard one label below it (Wasmo serves `<computer>.<host>` and `<app>-<computer>.<host>`), and
 point it at `127.0.0.1:54400`.
+
+## Trying shared app services (no deployment performed by this change)
+
+Build this branch and opt in with `WASMO_SERVICE_APPS=terrazzo,notes,photos,tasks` (use only install
+names you actually approve). The default is empty. The JVM loader uses each install name, not its
+manifest ID or GitHub repository; review the archive source before allowing an app. An unlisted
+install stays static, and an existing built-in factory cannot be overridden.
+
+Each allowlisted app gets the same `/api/wasmo/v1/` settings API on its own app origin and its own
+per-install SQL database. For example, install `terrazzo.wasmo` with the name `terrazzo`. No secrets
+key is needed for this settings-only stage. `haSession` and `publish` are always false. Do not
+configure or transfer HA credentials until the later session stage is reviewed. Hosted wasmo.com
+remains a static deployment.

@@ -19,6 +19,8 @@ import dev.zacsweers.metro.BindingContainer
 import dev.zacsweers.metro.Binds
 import dev.zacsweers.metro.Provides
 import dev.zacsweers.metro.SingleIn
+import ee.schimke.wasmo.services.AppServicesApp
+import ee.schimke.wasmo.services.serviceApps
 import io.ktor.server.application.Application
 import io.ktor.server.engine.EmbeddedServer
 import kotlin.time.Clock
@@ -78,9 +80,15 @@ abstract class ServiceBindings {
 
     @Provides
     @SingleIn(OsScope::class)
-    fun provideWasmoAppFactories(): Map<AppSlug, WasmoApp.Factory> = mapOf(
-      AppSlug("journal") to JournalWasmoApp.Factory(),
-    )
+    fun provideWasmoAppFactories(): Map<AppSlug, WasmoApp.Factory> = buildMap {
+      put(AppSlug("journal"), JournalWasmoApp.Factory())
+      // Temporary JVM simulation until the platform can load third-party app components.
+      for (name in serviceApps(System.getenv("WASMO_SERVICE_APPS"))) {
+        val slug = AppSlug(name)
+        require(slug !in this) { "App services cannot replace an existing built-in app: $slug" }
+        put(slug, AppServicesApp.Factory())
+      }
+    }
 
     @Provides
     @SingleIn(OsScope::class)

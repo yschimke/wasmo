@@ -18,6 +18,7 @@ kotlin {
         implementation(libs.okhttp)
         implementation(libs.okio)
         implementation(projects.apps.journal.wasmoApp)
+        implementation(projects.apps.services.wasmoApp)
         implementation(projects.identifiers)
         implementation(projects.os.api)
         implementation(projects.os.catalog)
