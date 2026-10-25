@@ -66,8 +66,10 @@ browser tests cover another independent device, failure recovery and the unchang
 
 Review and future rollout order: merged web seam → validate this shared server stage → review the
 cloud web integration. A server release, supported-install opt-in or archive cutover requires separate
-user authorization; none has been performed by this session. Real OS wiring remains blocked by
-[the existing journal npm graph](https://linear.app/yschimke/issue/SCH-50/wasmo-wiring-build-fails-resolving-peculiarasn1-x509-2111).
+user authorization; none has been performed by this session. The full OS wiring compile now passes.
+An earlier [registry resolution failure](https://linear.app/yschimke/issue/SCH-50/wasmo-wiring-build-fails-resolving-peculiarasn1-x509-2111)
+no longer reproduces; no dependency change, registry override or skipped check was needed. A live
+OS install and real owner-cookie flow remain unverified.
 
 The generic KV API is last-writer-wins and clients seed once per page. Atomic import prevents
 migration races; it does not merge concurrent usage ledgers or coordinate report idempotency.
