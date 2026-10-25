@@ -89,7 +89,10 @@ HA credential custody and public publishing are disabled here. Before enabling t
    already executing. Unpublish and sign-out must prevent a late job from restoring public objects.
 5. Public object responses currently cannot carry app-selected cache-control headers. Unpublish
    cannot retract already downloaded snapshots. Decide acceptable staleness and explain it in the UI.
-6. Stage the embed's static-state source before publication; it must never authenticate, open a
+6. Isolate public rendering from owner API privileges when the owner views a public card.
+   A remotely updated script running directly in the app origin can use that owner's private API.
+   See the [public renderer boundary](https://github.com/yschimke/homeassistant-remotecompose/blob/agent/wasmo-cloud-storage/docs/architecture/wasmo-cloud-backend.md#public-renderer-security-boundary).
+7. Stage the embed's static-state source before publication; it must never authenticate, open a
    Home Assistant connection or dispatch an action for public visitors.
 
 ## Validation
