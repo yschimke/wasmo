@@ -72,6 +72,6 @@ install stays static, and an existing built-in factory cannot be overridden.
 
 Each allowlisted app gets the same `/api/wasmo/v1/` settings API on its own app origin and its own
 per-install SQL database. For example, install `terrazzo.wasmo` with the name `terrazzo`. No secrets
-key is needed for this settings-only stage. `haSession` and `publish` are always false. Do not
-configure or transfer HA credentials until the later session stage is reviewed. Hosted wasmo.com
+key is needed for this settings-only stage. `publish` remains false. The optional [HA session stage](apps/services/HA-SESSIONS.md) requires
+separate review and a host-only `WASMO_SESSION_KEYS` key ring before `haSession` is enabled. Hosted wasmo.com
 remains a static deployment.

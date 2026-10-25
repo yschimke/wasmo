@@ -22,12 +22,19 @@ internal class AppServicesDb(private val database: SqlDatabase) {
         .use {
           checkNotNull(it.next()).getS32(0)!!
         }
-    if (version > 1) throw NewerSchema()
+    if (version > 2) throw NewerSchema()
     if (version == 0) {
       connection.execute(
         "CREATE TABLE wasmo_services_kv (key TEXT PRIMARY KEY, value TEXT NOT NULL)"
       )
       connection.execute("UPDATE wasmo_services_schema SET version = 1 WHERE singleton = 1")
+    }
+    if (version < 2) {
+      connection.execute(
+        "CREATE TABLE wasmo_services_ha (singleton INTEGER PRIMARY KEY CHECK (singleton = 1), initialized BOOLEAN NOT NULL, session_id TEXT NOT NULL, sealed TEXT)"
+      )
+      connection.execute("INSERT INTO wasmo_services_ha VALUES (1, FALSE, '', NULL)")
+      connection.execute("UPDATE wasmo_services_schema SET version = 2 WHERE singleton = 1")
     }
   }
 
@@ -89,7 +96,7 @@ internal class AppServicesDb(private val database: SqlDatabase) {
       connection.execute("DELETE FROM wasmo_services_kv WHERE key = $1") { bindString(0, key) }
     }
 
-  private suspend fun <T> transaction(block: suspend (SqlConnection) -> T): T =
+  internal suspend fun <T> transaction(block: suspend (SqlConnection) -> T): T =
     database.newConnection().use { connection ->
       connection.execute("BEGIN")
       try {

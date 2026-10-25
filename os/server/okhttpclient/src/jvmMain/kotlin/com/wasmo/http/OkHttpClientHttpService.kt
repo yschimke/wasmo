@@ -14,6 +14,7 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
+import okio.Buffer
 import okio.IOException
 import wasmo.http.HttpService
 import wasmo.http.httpUrl
@@ -21,11 +22,14 @@ import wit.wasmo.http.v0_1_0.Header
 import wit.wasmo.http.v0_1_0.HttpRequest
 import wit.wasmo.http.v0_1_0.HttpResponse
 
-@Inject
 @SingleIn(OsScope::class)
-class OkHttpClientHttpService(
+class OkHttpClientHttpService
+internal constructor(
   private val callFactory: Call.Factory,
+  private val maxResponseBytes: Long?,
 ) : HttpService {
+  @Inject constructor(callFactory: Call.Factory) : this(callFactory, null)
+
   override suspend fun execute(request: HttpRequest): HttpResponse {
     val call = callFactory.newCall(request.toOkHttp())
     return suspendCancellableCoroutine { continuation ->
@@ -40,10 +44,14 @@ class OkHttpClientHttpService(
 
           override fun onResponse(call: Call, response: Response) {
             response.use {
-              continuation.resume(response.toWasmo())
+              try {
+                continuation.resume(response.toWasmo(maxResponseBytes))
+              } catch (failure: IOException) {
+                continuation.resumeWithException(failure)
+              }
             }
           }
-        },
+        }
       )
     }
   }
@@ -73,19 +81,28 @@ internal fun HttpRequest.toOkHttp(): Request {
   )
 }
 
-internal fun Response.toWasmo(): HttpResponse {
-  val headers = headers
-    .map { Header(it.first, it.second) }
-    .toMutableList()
+internal fun Response.toWasmo(maxBytes: Long? = null): HttpResponse {
+  val headers = headers.map { Header(it.first, it.second) }.toMutableList()
 
   val contentType = body.contentType()
   if (contentType != null) {
     headers += Header("Content-Type", contentType.toString())
   }
 
+  val bytes =
+    if (maxBytes == null) body.byteString()
+    else {
+      val buffer = Buffer()
+      val source = body.source()
+      while (buffer.size <= maxBytes) {
+        if (source.read(buffer, minOf(8192L, maxBytes + 1 - buffer.size)) == -1L) break
+      }
+      buffer.readByteString()
+    }
+  if (maxBytes != null && bytes.size > maxBytes) throw IOException("Response is too large")
   return HttpResponse(
     code = code.toUInt(),
     headers = headers,
-    body = body.byteString(),
+    body = bytes,
   )
 }

@@ -10,6 +10,10 @@ import wasmo.sql.SqlService
 interface Platform {
   val clock: Clock
   val httpService: HttpService
+  /** Bounded, redirect-free HTTPS to public Internet addresses. Null on older hosts. */
+  val publicHttpsService: HttpService? get() = null
+  /** Canonical installed app root URL from deployment configuration, never a forwarded Host. */
+  val applicationUrl: String? get() = null
   val objectStore: ObjectStore
   val downloader: Downloader
   val sqlService: SqlService

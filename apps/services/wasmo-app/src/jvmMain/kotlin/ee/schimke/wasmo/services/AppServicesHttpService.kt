@@ -13,7 +13,11 @@ import wit.wasmo.http.v0_1_0.HttpRequest
 import wit.wasmo.http.v0_1_0.HttpResponse as Response
 
 /** Wasmo routes app-code requests only for the computer owner. No public API or CORS headers. */
-class AppServicesHttpService internal constructor(private val db: AppServicesDb) : HttpService {
+class AppServicesHttpService
+internal constructor(
+  private val db: AppServicesDb,
+  private val sessions: HaSessionService? = null,
+) : HttpService {
   override suspend fun execute(request: HttpRequest): Response {
     val path =
       try {
@@ -41,10 +45,27 @@ class AppServicesHttpService internal constructor(private val db: AppServicesDb)
     try {
       // Re-check on every request. Refuse a newer schema even if this instance ran before it.
       db.ensureSchema()
+      if (route.startsWith("ha/")) {
+        val handler = sessions ?: return error(404U, "ha-session-unavailable")
+        if (request.method != "GET") {
+          if (request.contentType?.substringBefore(';')?.trim() != "application/json")
+            return error(415U, "json-required")
+          if (!boundedJsonDepth(request.body?.utf8() ?: "{}")) return error(400U, "json-too-deep")
+        }
+        try {
+          return handler.execute(route, request)
+        } catch (failure: HaSessionService.Failure) {
+          return error(failure.status, failure.code)
+        } catch (_: java.io.IOException) {
+          return error(502U, "ha-unavailable")
+        } catch (_: IllegalArgumentException) {
+          return error(400U, "invalid-ha-destination")
+        }
+      }
       return when {
         route == "capabilities" && request.method == "GET" ->
           json(
-            """{"api":1,"backend":"wasmo-app-services","kv":true,"kvImport":true,"haSession":false,"publish":false}"""
+            """{"api":1,"backend":"wasmo-app-services","kv":true,"kvImport":true,"haSession":${sessions != null},"publish":false}"""
           )
         route == "kv" && request.method == "GET" -> json(db.read().toString())
         isImport || (route.startsWith("kv/") && request.method == "PUT") -> {
@@ -86,27 +107,6 @@ class AppServicesHttpService internal constructor(private val db: AppServicesDb)
     } catch (_: AppServicesDb.StorageLimit) {
       return error(413U, "storage-limit")
     }
-  }
-
-  private fun boundedJsonDepth(text: String): Boolean {
-    var depth = 0
-    var quoted = false
-    var escaped = false
-    for (char in text) {
-      if (quoted) {
-        if (escaped) escaped = false
-        else if (char == '\\') escaped = true else if (char == '"') quoted = false
-      } else {
-        when (char) {
-          '"' -> quoted = true
-          '{',
-          '[' -> if (++depth > 64) return false
-          '}',
-          ']' -> depth--
-        }
-      }
-    }
-    return true
   }
 
   private fun error(status: UInt, name: String) = json("""{"error":"$name"}""", status)
