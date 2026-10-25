@@ -139,6 +139,8 @@ class HaSessionServiceTest {
       val id = f.id()
       assertEquals(200U, f.request("ha/session", "DELETE", """{"sessionId":"$id"}""").code)
       assertEquals(1, f.revokes)
+      assertEquals(200U, f.request("ha/session", "DELETE", """{"sessionId":"$id"}""").code)
+      assertEquals(1, f.revokes)
       assertNotEquals(id, f.id())
       assertEquals(409U, f.request("ha/session/import", "POST", input).code)
       assertEquals(401U, f.request("ha/token", "POST", """{"sessionId":"$id"}""").code)
@@ -221,6 +223,40 @@ class HaSessionServiceTest {
         }
       assertEquals(502U, f.request("ha/session", "PUT", input).code)
       assertTrue(f.request("ha/session").body.utf8().contains("\"signedIn\":false"))
+    }
+  }
+
+  @Test
+  fun supportsOlderHaRevocationOnlyAfterNewEndpointIsMissing() = runTest {
+    fixture { f ->
+      f.request("ha/session", "PUT", input)
+      val id = f.id()
+      var fallbackCalled = false
+      f.platform.publicHttpsService =
+        FakeHttpService().apply {
+          this += FakeHttpService.Handler { request ->
+            if (request.url.value.endsWith("/auth/revoke")) HttpResponse(code = 404U)
+            else {
+              assertTrue(request.url.value.endsWith("/auth/token"))
+              assertTrue(request.body!!.utf8().contains("action=revoke"))
+              fallbackCalled = true
+              HttpResponse()
+            }
+          }
+        }
+      assertEquals(200U, f.request("ha/session", "DELETE", """{"sessionId":"$id"}""").code)
+      assertTrue(fallbackCalled)
+      assertTrue(f.request("ha/session").body.utf8().contains("\"signedIn\":false"))
+    }
+  }
+
+  @Test
+  fun explicitSignoutBeforeFirstImportAlsoCreatesATombstone() = runTest {
+    fixture { f ->
+      assertEquals(200U, f.request("ha/session", "DELETE", """{"sessionId":""}""").code)
+      assertEquals(409U, f.request("ha/session/import", "POST", input).code)
+      assertEquals(0, f.refreshes)
+      assertEquals(200U, f.request("ha/session", "PUT", input).code)
     }
   }
 }
