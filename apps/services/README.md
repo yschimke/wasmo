@@ -58,9 +58,20 @@ opt-in built-in JVM factory uses the implemented isolation and leaves the deploy
 
 ## Remaining stages and security decisions
 
-The web detection/local-storage seam is a separate PR in homeassistant-remotecompose. The next web
-stage must seed SQL settings before the first frame, coalesce writes, preserve failed writes in memory
-and migrate browser values only after acknowledged persistence.
+The [web detection/local-storage seam](https://github.com/yschimke/homeassistant-remotecompose/pull/1225)
+is merged. The [cloud-settings integration](https://github.com/yschimke/homeassistant-remotecompose/pull/1228)
+is a separate draft: it seeds settings before composition, coalesces writes, retains failed writes
+and imports known browser values only after atomic acknowledged persistence. Its production Wasm
+browser tests cover another independent device, failure recovery and the unchanged static path.
+
+Review and future rollout order: merged web seam → validate this shared server stage → review the
+cloud web integration. A server release, supported-install opt-in or archive cutover requires separate
+user authorization; none has been performed by this session. Real OS wiring remains blocked by
+[the existing journal npm graph](https://linear.app/yschimke/issue/SCH-50/wasmo-wiring-build-fails-resolving-peculiarasn1-x509-2111).
+
+The generic KV API is last-writer-wins and clients seed once per page. Atomic import prevents
+migration races; it does not merge concurrent usage ledgers or coordinate report idempotency.
+Those remain app-level design questions before claiming combined counts across active devices.
 
 HA credential custody and public publishing are disabled here. Before enabling them:
 
