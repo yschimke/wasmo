@@ -34,6 +34,18 @@ suspend fun insertOrUpdateInstalledApp(
   version: Long,
   wasmoFileAddress: WasmoFileAddress,
 ): InstalledAppId {
+  // Reactivate the same installation so its SQL databases and objects are retained.
+  connection.execute(
+    """
+    UPDATE InstalledApp
+    SET active = $1
+    WHERE computer_id = $2 AND slug = $3 AND active = FALSE
+    """,
+  ) {
+    bindBool(0, active)
+    bindComputerId(1, computerId)
+    bindAppSlug(2, slug)
+  }
   val rowIterator = connection.executeQuery(
     """
     INSERT INTO InstalledApp(
@@ -244,3 +256,17 @@ private fun SqlRow.getInstalledApp() = DbInstalledApp(
   activeReleaseId = getInstalledAppReleaseIdOrNull(7),
 )
 
+/** Disable routing and launcher visibility without deleting app data. Idempotent. */
+context(connection: SqlConnection)
+suspend fun deactivateInstalledApp(computerId: ComputerId, slug: AppSlug) {
+  connection.execute(
+    """
+    UPDATE InstalledApp
+    SET active = FALSE
+    WHERE computer_id = $1 AND slug = $2 AND active = TRUE
+    """,
+  ) {
+    bindComputerId(0, computerId)
+    bindAppSlug(1, slug)
+  }
+}

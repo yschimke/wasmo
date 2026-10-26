@@ -13,6 +13,10 @@ interface WasmoApi {
     request: InstallAppRequest,
   ): InstallAppResponse
 
+  suspend fun removeApp(
+    request: RemoveAppRequest,
+  ): RemoveAppResponse
+
   suspend fun linkEmailAddress(
     request: LinkEmailAddressRequest,
   ): LinkEmailAddressResponse

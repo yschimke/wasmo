@@ -19,6 +19,8 @@ import com.wasmo.identifiers.ComputerSlug
 import dev.zacsweers.metro.Assisted
 import dev.zacsweers.metro.AssistedFactory
 import dev.zacsweers.metro.AssistedInject
+import kotlinx.browser.window
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.web.attributes.AttrsScope
@@ -34,8 +36,11 @@ class ComputerUi(
   private val computerDataService: ComputerDataService,
   computerSnapshot: ComputerSnapshot?,
 ) : Ui {
-  private val computerSnapshot: ComputerSnapshot = computerSnapshot
-    ?: error("unexpected call of ComputerUi.Factory.create(), snapshot is absent")
+  private var computerSnapshot by mutableStateOf(
+    computerSnapshot ?: error("unexpected call of ComputerUi.Factory.create(), snapshot is absent"),
+  )
+
+  private var removingApp by mutableStateOf<AppSlug?>(null)
 
   private var menuModel by mutableStateOf<ComputerMenuModel?>(null)
   private var installAppDialogModel by mutableStateOf<InstallAppDialogModel?>(null)
@@ -46,6 +51,7 @@ class ComputerUi(
   ) {
     Computer(
       attrs = attrs,
+      removingApp = removingApp,
       scrimVisible = menuModel != null || installAppDialogModel != null,
       eventListener = ::onComputerEvent,
       overlays = { computerChildAttrs ->
@@ -77,6 +83,28 @@ class ComputerUi(
           route = routeCodec.decode(appSnapshot.homeUrl.decodeUrl()),
           transitionDirection = TransitionDirection.PUSH,
         )
+      }
+
+      is ComputerEvent.ClickRemoveApp -> {
+        if (removingApp != null) return
+        val confirmed = window.confirm(
+          "Remove ${event.app.value}? It will disappear from this computer and its URL will stop " +
+            "working. Stored data is kept for a later reinstall.",
+        )
+        if (!confirmed) return
+        removingApp = event.app
+        coroutineScope.launch {
+          try {
+            computerSnapshot = computerDataService.remove(event.app)
+          } catch (e: CancellationException) {
+            throw e
+          } catch (e: Exception) {
+            logger.info("failed to remove app", e)
+            window.alert("Could not remove ${event.app.value}. Please try again.")
+          } finally {
+            removingApp = null
+          }
+        }
       }
 
       ComputerEvent.ClickScrim -> {

@@ -35,6 +35,18 @@ abstract class ComputersBindings {
       )
 
     @Provides
+    @IntoSet
+    @SingleIn(OsScope::class)
+    fun provideRemoveAppActionRegistration(
+      hostnamePatterns: HostnamePatterns,
+    ): ActionRegistration = ActionRegistration.Http(
+      host = hostnamePatterns.computerRegex,
+      path = "/remove-app",
+      method = "POST",
+      action = RemoveAppAction::class,
+    )
+
+    @Provides
     @SingleIn(OsScope::class)
     fun provideInstallAppJobQueue(
       jobQueueFactory: OsJobQueue.Factory,
