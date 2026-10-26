@@ -2,6 +2,7 @@ package com.wasmo.client.app.computer
 
 import androidx.compose.runtime.Composable
 import com.wasmo.api.ComputerSnapshot
+import com.wasmo.compose.Button
 import com.wasmo.compose.Icon
 import com.wasmo.compose.LauncherIconList
 import com.wasmo.compose.LauncherScreen
@@ -19,6 +20,7 @@ import org.jetbrains.compose.web.css.percent
 import org.jetbrains.compose.web.css.px
 import org.jetbrains.compose.web.css.width
 import org.jetbrains.compose.web.dom.DOMScope
+import org.jetbrains.compose.web.dom.Div
 import org.jetbrains.compose.web.dom.Text
 import org.w3c.dom.HTMLDivElement
 import org.w3c.dom.HTMLElement
@@ -27,6 +29,7 @@ import org.w3c.dom.HTMLElement
 fun Computer(
   attrs: AttrsScope<HTMLElement>.() -> Unit = {},
   scrimVisible: Boolean,
+  removingApp: AppSlug? = null,
   snapshot: ComputerSnapshot,
   eventListener: (ComputerEvent) -> Unit,
   overlays: @Composable DOMScope<HTMLDivElement>.(
@@ -60,8 +63,22 @@ fun Computer(
 
       LauncherIconList {
         for (app in snapshot.apps) {
-          Icon(app.launcherLabel, app.maskableIconUrl) {
-            eventListener(ComputerEvent.ClickApp(app.slug))
+          Div(attrs = { classes("InstalledApp") }) {
+            Icon(app.launcherLabel, app.maskableIconUrl) {
+              eventListener(ComputerEvent.ClickApp(app.slug))
+            }
+            Button(
+              outline = true,
+              disabled = removingApp != null,
+              busy = removingApp == app.slug,
+              attrs = {
+                classes("RemoveAppButton")
+                attr("aria-label", "Remove ${app.slug.value}")
+                onClick { eventListener(ComputerEvent.ClickRemoveApp(app.slug)) }
+              },
+            ) {
+              Text("Remove ${app.slug.value}")
+            }
           }
         }
       }
@@ -105,6 +122,8 @@ sealed interface ComputerEvent {
   data class ClickApp(
     val app: AppSlug,
   ) : ComputerEvent
+
+  data class ClickRemoveApp(val app: AppSlug) : ComputerEvent
 
   object ClickShowMenu : ComputerEvent
   object ClickScrim : ComputerEvent

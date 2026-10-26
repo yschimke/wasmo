@@ -18,6 +18,8 @@ import com.wasmo.api.LinkUsernameRequest
 import com.wasmo.api.LinkUsernameResponse
 import com.wasmo.api.RegisterPasskeyRequest
 import com.wasmo.api.RegisterPasskeyResponse
+import com.wasmo.api.RemoveAppRequest
+import com.wasmo.api.RemoveAppResponse
 import com.wasmo.api.WasmoApi
 import com.wasmo.api.WasmoJson
 import com.wasmo.client.identifiers.ClientAppScope
@@ -48,6 +50,10 @@ class RealWasmoApi : WasmoApi {
     request: InstallAppRequest,
   ): InstallAppResponse {
     return call("/install-app", request)
+  }
+
+  override suspend fun removeApp(request: RemoveAppRequest): RemoveAppResponse {
+    return call("/remove-app", request, jsonContentType = true)
   }
 
   override suspend fun linkEmailAddress(
@@ -83,6 +89,7 @@ class RealWasmoApi : WasmoApi {
   suspend inline fun <reified S, reified R> call(
     path: String,
     request: S,
+    jsonContentType: Boolean = false,
   ): R {
     val requestSerializer = serializer<S>()
     val responseDeserializer = serializer<R>()
@@ -96,6 +103,9 @@ class RealWasmoApi : WasmoApi {
       }
       """,
     )
+    if (jsonContentType) {
+      request.headers = js("({'Content-Type': 'application/json'})")
+    }
     val response = window.fetch(path, request).await()
 
     if (response.status !in 200..<300) {

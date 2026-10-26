@@ -44,6 +44,22 @@ class ComputerTest {
     }
   }
 
+  @Test
+  fun duplicateAppNames() = runTest {
+    snapshotTester.snapshot {
+      Computer(
+        scrimVisible = false,
+        snapshot = ComputerSnapshot(
+          slug = ComputerSlug("yuri"),
+          apps = listOf("terrazzo", "terrazzo2").map { slug ->
+            app("Terrazzo").copy(slug = AppSlug(slug))
+          },
+        ),
+        eventListener = {},
+      )
+    }
+  }
+
   @Composable
   fun Subject() {
     Computer(
@@ -81,7 +97,7 @@ class ComputerTest {
   }
 
   private fun app(launcherLabel: String) = InstalledAppSnapshot(
-    slug = AppSlug("app"),
+    slug = AppSlug(launcherLabel.lowercase().replace(" ", "")),
     launcherLabel = launcherLabel,
     maskableIconUrl = "/assets/launcher/sample-icon.svg",
     homeUrl = "/",

@@ -34,6 +34,8 @@ class InstallAppJobHandler(
       installedApp to computerStore.get(installedApp.computerId)
     }
 
+    if (installedApp.active != true) return
+
     val installer = computerService.resourceInstallerFactory.create(
       appSlug = installedApp.slug,
       wasmoFileAddress = installedApp.wasmoFileAddress,

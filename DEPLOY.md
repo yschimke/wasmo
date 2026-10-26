@@ -27,6 +27,11 @@ particular deployment — the public URL, secrets and DNS name are all supplied 
   This is a temporary bridge until Wasmo can execute third-party app components. See
   [the staged implementation](apps/services/README.md). It does not package browser assets.
 
+- **Remove installed apps** — each launcher entry has a Remove button showing its install name.
+  Confirmation disables that installation, its app URL, and delivery of queued app jobs. Stored files and SQL data are retained;
+  reinstalling under the same name reactivates the existing installation. Removal is restricted to
+  the computer's owner and requires a same-origin JSON POST.
+
 Keep this list small and the edits minimal: every patch is a potential merge conflict when the
 branch re-syncs.
 

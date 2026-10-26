@@ -17,16 +17,19 @@ import com.wasmo.api.InstallAppRequest
 import com.wasmo.api.LinkEmailAddressRequest
 import com.wasmo.api.LinkUsernameRequest
 import com.wasmo.api.RegisterPasskeyRequest
+import com.wasmo.api.RemoveAppRequest
 import com.wasmo.api.SignOutRequest
 import com.wasmo.api.routes.Route
 import com.wasmo.api.routes.RouteCodec
 import com.wasmo.api.routes.RoutingContext
 import com.wasmo.computers.InstallAppRpc
+import com.wasmo.computers.RemoveAppAction
 import com.wasmo.computers.paid.PaidCreateComputerSpecRpc
 import com.wasmo.emails.ConfirmEmailAddressRpc
 import com.wasmo.emails.LinkEmailAddressRpc
 import com.wasmo.framework.Request
 import com.wasmo.framework.Url
+import com.wasmo.framework.toWasmoUrl
 import com.wasmo.identifiers.AccountPassword
 import com.wasmo.identifiers.ComputerSlug
 import com.wasmo.identifiers.Deployment
@@ -60,6 +63,7 @@ class CallTester(
   private val createInviteRpcProvider: () -> CreateInviteRpc,
   private val createUsernameRpcProvider: () -> CreateUsernameRpc,
   private val installAppRpcProvider: () -> InstallAppRpc,
+  private val removeAppActionProvider: () -> RemoveAppAction,
   private val linkEmailAddressRpcProvider: () -> LinkEmailAddressRpc,
   private val linkUsernameRpcProvider: () -> LinkUsernameRpc,
   private val osPageProvider: () -> OsPage,
@@ -148,6 +152,17 @@ class CallTester(
     computerSlug: ComputerSlug,
     request: InstallAppRequest,
   ) = installAppRpcProvider().install(computerSlug, request)
+
+  suspend fun removeApp(computerSlug: ComputerSlug, request: RemoveAppRequest) =
+    removeAppActionProvider().remove(computerSlug, request)
+
+  suspend fun removeAppRequest(
+    request: Request,
+    url: Url = request.url.toWasmoUrl(),
+  ) = removeAppActionProvider().invoke(
+    url,
+    request,
+  )
 
   suspend fun linkEmailAddress(request: LinkEmailAddressRequest) =
     linkEmailAddressRpcProvider().link(request)

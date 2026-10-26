@@ -407,3 +407,20 @@ button {
   color: rgba(255 255 255 / 1.0);
   background: rgba(0 0 0 / 0.3);
 }
+
+.InstalledApp {
+  width: 25%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.RemoveAppButton {
+  font-size: 0.75rem;
+  padding: 4px;
+  margin: 0;
+  max-width: calc(100% - 8px);
+  min-height: 44px;
+  overflow-wrap: anywhere;
+}
