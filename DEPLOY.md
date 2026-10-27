@@ -18,6 +18,15 @@ particular deployment — the public URL, secrets and DNS name are all supplied 
   (server) and `routing_context.rootUrl` (browser) instead of a hardcoded `wasmo.com`/`.dev`/
   `.localhost` list, so `<computer>.<host>` and `<app>-<computer>.<host>` resolve on any domain.
   Without it a subdomain deployment renders computer pages blank and 500s on installed-app hosts.
+- **HTTPS session cookies** — when `WASMO_BASE_URL` is `https://`, the session cookie is
+  `__Http-wasmo_session` (Secure, HttpOnly) instead of the script-readable local-development
+  `wasmo_session`, which is expired on the next visit. Every app origin shares the cookie's domain,
+  so without this any installed app could read the owner's session. Switching signs everyone out once.
+- **Cookie signing secret** — session cookies and email challenge tokens are signed with
+  `WASMO_COOKIE_SECRET` (hex) if set, otherwise a key derived from `WASMO_PASSWORD_PEPPER`; upstream
+  Homelab uses a constant from source. Changing either signs everyone out.
+- **Same-origin RPCs** — every RPC (install, link username, sign out, …) requires an `Origin` header
+  matching its own host, so a sibling app origin can't call them with the owner's cookie.
 - **`WASMO_ADMIN_PASSWORD`** (optional) — sets a password on the bootstrapped, otherwise
   passwordless `admin` account at startup, if it has none yet. Set it on any homelab reachable off
   localhost, or anyone can sign in as `admin`. Idempotent: it never overwrites an existing password.

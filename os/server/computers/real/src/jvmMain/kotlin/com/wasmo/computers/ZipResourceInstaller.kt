@@ -25,9 +25,13 @@ import okio.source
 import wasmo.http.HttpRequest
 import wasmo.http.HttpService
 import wasmo.http.isSuccessful
+import wasmo.objectstore.Key
 import wasmo.objectstore.ObjectStore
 import wasmo.objectstore.PutObjectRequest
 import wasmo.objectstore.ScopedObjectStore
+import wit.wasmo.objectstore.v0_1_0.DeleteObjectRequest
+import wit.wasmo.objectstore.v0_1_0.Entry
+import wit.wasmo.objectstore.v0_1_0.ListObjectsRequest
 
 /**
  * Downloads a `.wasmo` ZIP file from the Internet and writes it to the object store.
@@ -43,6 +47,25 @@ class ZipResourceInstaller(
   override suspend fun install(): AppManifest? {
     context(issueCollector.url(wasmoFileAddress.url.toString())) {
       return installInternal()
+    }
+  }
+
+  override suspend fun pruneOtherVersions(keepVersion: Long) {
+    // Each upgrade writes a full copy under resources/v<version>/; nothing serves the old ones.
+    val prefix = "$appSlug/resources/"
+    val keep = "${prefix}v$keepVersion/"
+    val stale = mutableListOf<Key>()
+    var request: ListObjectsRequest? = ListObjectsRequest(prefix = prefix, delimiter = null, continuationToken = null)
+    while (request != null) {
+      val response = computerObjectStore.list(request)
+      for (entry in response.entries) {
+        val key = (entry as? Entry.Object)?.value?.key ?: continue
+        if (!key.value.startsWith(keep)) stale += key
+      }
+      request = response.nextRequest
+    }
+    for (key in stale) {
+      computerObjectStore.delete(DeleteObjectRequest(key))
     }
   }
 

@@ -13,6 +13,7 @@ import com.wasmo.support.issues.Issue
 import com.wasmo.testing.apps.RecipesApp
 import com.wasmo.testing.events.AfterInstallEvent
 import com.wasmo.testing.framework.ResponseBodySnapshot
+import com.wasmo.testing.framework.resourceHeaders
 import com.wasmo.testing.service.ServiceTester
 import kotlin.test.Test
 import kotlinx.coroutines.test.runTest
@@ -63,6 +64,7 @@ class InstallAppRpcTest {
     assertThat(installedApp.call("/"))
       .isEqualTo(
         Response(
+          headers = resourceHeaders("Welcome to the recipes app"),
           contentType = "text/html".toMediaType(),
           body = ResponseBodySnapshot("Welcome to the recipes app"),
         ),

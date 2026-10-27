@@ -18,6 +18,9 @@ class SessionKeys private constructor(private val keys: Map<String, SecretKeySpe
     return "$id.${Base64.getEncoder().encodeToString(nonce)}.${Base64.getEncoder().encodeToString(bytes)}"
   }
 
+  /** True if [value] was sealed with the key [seal] uses now. */
+  internal fun isActive(value: String): Boolean = value.substringBefore('.') == keys.keys.first()
+
   internal fun open(context: String, value: String): String {
     val parts = value.split('.')
     require(parts.size == 3)

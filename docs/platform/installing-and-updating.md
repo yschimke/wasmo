@@ -10,9 +10,13 @@ install to retry a failed download. The previous release stays selected if downl
 the new archive fails. Installation runs asynchronously after the dialog closes.
 
 Publish updated assets with a new manifest `version`. Resources are stored under that version;
-reusing a version with different content overwrites its resources. The app's `afterInstall` hook
+reusing a version with different content overwrites its resources. Once a new release is active,
+resources stored for other versions are deleted. Resources are served with `Cache-Control: no-cache`
+and a content `ETag`, so browsers keep them and revalidate each use. The app's `afterInstall` hook
 receives the previous manifest version (or `0` for a first successful install) and the new version,
 so it can migrate existing data. App authors should make migrations safe to retry.
 
-There is currently no delete/uninstall control. Updating in place avoids deleting data to install a
-new release. Installing under another name creates an independent installation with its own data.
+The launcher's Remove button disables an installation and its URL but keeps its data, so installing
+under the same name restores it. Before removal the app's `beforeRemove` hook runs, so it can give up
+grants it holds outside Wasmo; a failing hook doesn't block removal. Installing under another name
+creates an independent installation with its own data.

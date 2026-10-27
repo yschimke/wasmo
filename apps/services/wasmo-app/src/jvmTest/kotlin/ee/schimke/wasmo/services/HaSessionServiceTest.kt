@@ -169,6 +169,51 @@ class HaSessionServiceTest {
   }
 
   @Test
+  fun forgetSignsOutWhenHaCannotConfirmRevocation() = runTest {
+    fixture { f ->
+      f.request("ha/session", "PUT", input)
+      val id = f.id()
+      f.status = 503U
+      val response =
+        f.request("ha/session", "DELETE", """{"sessionId":"$id","forget":true}""").body.utf8()
+      assertTrue(response.contains("\"revoked\":false"))
+      assertTrue(f.request("ha/session").body.utf8().contains("\"signedIn\":false"))
+      assertEquals(409U, f.request("ha/session/import", "POST", input).code)
+    }
+  }
+
+  @Test
+  fun replacingASessionRevokesThePreviousGrant() = runTest {
+    fixture { f ->
+      f.request("ha/session", "PUT", input)
+      assertEquals(0, f.revokes)
+      val other = input.replace("private-fixture-refresh", "private-fixture-other")
+      assertEquals(200U, f.request("ha/session", "PUT", other).code)
+      assertEquals(1, f.revokes)
+      // The same grant signing in again is not revoked.
+      assertEquals(200U, f.request("ha/session", "PUT", other).code)
+      assertEquals(1, f.revokes)
+    }
+  }
+
+  @Test
+  fun removalRevokesAndForgetsEvenWhenHaIsDown() = runTest {
+    fixture { f ->
+      f.request("ha/session", "PUT", input)
+      AppServicesApp.Factory(keys).create(f.platform).beforeRemove()
+      assertEquals(1, f.revokes)
+      assertTrue(f.request("ha/session").body.utf8().contains("\"signedIn\":false"))
+      // A reinstall can't resume the grant from old browser tokens either.
+      assertEquals(409U, f.request("ha/session/import", "POST", input).code)
+
+      f.request("ha/session", "PUT", input)
+      f.status = 503U
+      AppServicesApp.Factory(keys).create(f.platform).beforeRemove()
+      assertTrue(f.request("ha/session").body.utf8().contains("\"signedIn\":false"))
+    }
+  }
+
+  @Test
   fun validatesOriginClientAndCsrfBeforeCallingHa() = runTest {
     fixture { f ->
       assertEquals(403U, f.request("ha/session", "PUT", input, csrf = false).code)

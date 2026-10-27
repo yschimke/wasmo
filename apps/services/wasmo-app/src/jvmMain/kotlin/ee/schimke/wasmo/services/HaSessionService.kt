@@ -6,6 +6,7 @@ import java.util.UUID
 import kotlin.time.Clock
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -28,25 +29,25 @@ internal class HaSessionService(
   private val clock: Clock,
   private val applicationUrl: String,
 ) {
-  suspend fun execute(route: String, request: Request): Response = db.transaction { connection ->
-    connection.execute("SET LOCAL lock_timeout = '3s'")
-    val row =
-      connection
-        .executeQuery(
-          "SELECT initialized, session_id, sealed, current_database()::TEXT FROM wasmo_services_ha WHERE singleton = 1 FOR UPDATE"
-        )
-        .use {
-          val row = it.next()!!
-          Stored(row.getBool(0)!!, row.getString(1)!!, row.getString(2), row.getString(3)!!)
-        }
-    val current =
-      row.sealed?.let {
-        try {
-          Json.parseToJsonElement(keys.open(row.context, it)).jsonObject
-        } catch (_: Exception) {
-          throw Failure(503U, "session-key-unavailable")
-        }
+  /**
+   * Called when the owner removes the app: revoke the grant at HA and forget it, keeping the
+   * sign-out tombstone so a reinstall can't resume it. HA being unreachable doesn't keep custody.
+   */
+  suspend fun revokeForRemoval(): Unit = db.transaction { connection ->
+    val row = lock(connection)
+    val current = row.open()
+    if (current != null) {
+      try {
+        revoke(current)
+      } catch (_: Exception) {
       }
+    }
+    save(connection, UUID.randomUUID().toString(), null)
+  }
+
+  suspend fun execute(route: String, request: Request): Response = db.transaction { connection ->
+    val row = lock(connection)
+    val current = row.open()
     if (route == "ha/session" && request.method == "GET") {
       return@transaction json(
         buildJsonObject {
@@ -77,6 +78,13 @@ internal class HaSessionService(
           throw Failure(400U, "invalid-token")
         // Validate at HA before committing custody; do not trust browser-supplied access tokens.
         val session = refresh(origin, clientId, refreshToken)
+        // Switching servers or accounts must not leave the previous grant live at HA.
+        if (current != null && current.string("refreshToken") != session.string("refreshToken")) {
+          try {
+            revoke(current)
+          } catch (_: Exception) {
+          }
+        }
         val id = UUID.randomUUID().toString()
         save(connection, id, keys.seal(row.context, session.toString()))
         json(
@@ -107,8 +115,10 @@ internal class HaSessionService(
               return@transaction json(buildJsonObject { put("error", "sign-in-required") }, 401U)
             }
           }
-        // Re-encrypt even cache hits with the active key during a staged rotation.
-        save(connection, row.id, keys.seal(row.context, session.toString()))
+        // Re-encrypt cache hits only during a staged rotation, so routine reads stay cheap.
+        if (session !== current || !keys.isActive(row.sealed!!)) {
+          save(connection, row.id, keys.seal(row.context, session.toString()))
+        }
         json(
           buildJsonObject {
             put("access_token", session.string("accessToken"))
@@ -127,36 +137,75 @@ internal class HaSessionService(
           return@transaction json(buildJsonObject { put("signedIn", false) })
         }
         if (expected != row.id) throw Failure(409U, "session-changed")
-        if (current != null) {
-          var response =
-            http.execute(
-              HttpRequest(
-                method = "POST",
-                url = current.string("hassUrl") + "/auth/revoke",
-                headers = FORM_HEADERS,
-                body = form(mapOf("token" to current.string("refreshToken"))).encodeUtf8(),
-              )
-            )
-          // Older HA releases support revocation only on the token endpoint.
-          if (response.code == 404U)
-            response =
-              http.execute(
-                HttpRequest(
-                  method = "POST",
-                  url = current.string("hassUrl") + "/auth/token",
-                  headers = FORM_HEADERS,
-                  body =
-                    form(mapOf("token" to current.string("refreshToken"), "action" to "revoke"))
-                      .encodeUtf8(),
-                )
-              )
-          if (response.code != 200U) throw Failure(502U, "ha-unavailable")
-        }
+        // "forget" lets the owner sign out of a Home Assistant that is down or gone for good; the
+        // grant then stays valid at HA until it expires or is removed there.
+        val forget = input["forget"]?.jsonPrimitive?.booleanOrNull == true
+        val revoked =
+          try {
+            revoke(current)
+            true
+          } catch (failure: Exception) {
+            if (!forget) throw failure
+            false
+          }
         save(connection, UUID.randomUUID().toString(), null)
-        json(buildJsonObject { put("signedIn", false) })
+        json(
+          buildJsonObject {
+            put("signedIn", false)
+            put("revoked", revoked)
+          }
+        )
       }
       else -> throw Failure(404U, "not-found")
     }
+  }
+
+  private suspend fun lock(connection: SqlConnection): Stored {
+    connection.execute("SET LOCAL lock_timeout = '3s'")
+    return connection
+      .executeQuery(
+        "SELECT initialized, session_id, sealed, current_database()::TEXT FROM wasmo_services_ha WHERE singleton = 1 FOR UPDATE"
+      )
+      .use {
+        val row = it.next()!!
+        Stored(row.getBool(0)!!, row.getString(1)!!, row.getString(2), row.getString(3)!!)
+      }
+  }
+
+  private fun Stored.open(): JsonObject? =
+    sealed?.let {
+      try {
+        Json.parseToJsonElement(keys.open(context, it)).jsonObject
+      } catch (_: Exception) {
+        throw Failure(503U, "session-key-unavailable")
+      }
+    }
+
+  /** Revokes [session]'s refresh token at HA, or throws [Failure] if HA doesn't confirm it. */
+  private suspend fun revoke(session: JsonObject) {
+    var response =
+      http.execute(
+        HttpRequest(
+          method = "POST",
+          url = session.string("hassUrl") + "/auth/revoke",
+          headers = FORM_HEADERS,
+          body = form(mapOf("token" to session.string("refreshToken"))).encodeUtf8(),
+        )
+      )
+    // Older HA releases support revocation only on the token endpoint.
+    if (response.code == 404U)
+      response =
+        http.execute(
+          HttpRequest(
+            method = "POST",
+            url = session.string("hassUrl") + "/auth/token",
+            headers = FORM_HEADERS,
+            body =
+              form(mapOf("token" to session.string("refreshToken"), "action" to "revoke"))
+                .encodeUtf8(),
+          )
+        )
+    if (response.code != 200U) throw Failure(502U, "ha-unavailable")
   }
 
   private suspend fun refresh(origin: String, clientId: String, token: String): JsonObject {

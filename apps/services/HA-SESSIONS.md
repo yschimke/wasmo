@@ -32,7 +32,7 @@ Every mutation, including access-token requests, requires `X-Wasmo-Api: 1`.
 | `PUT ha/session` | Explicit sign-in: `{hassUrl, clientId, refreshToken}`; validate and replace |
 | `POST ha/session/import` | Same input, only if never initialized; 409 after any prior sign-in/sign-out |
 | `POST ha/token` | `{sessionId}`; return only short-lived access token, expiry, origin and session ID |
-| `DELETE ha/session` | `{sessionId}`; revoke at HA, then clear custody; failures retain custody and reject |
+| `DELETE ha/session` | `{sessionId, forget?}`; revoke at HA, then clear custody; failures retain custody and reject unless `forget` is true, which clears it anyway and answers `revoked: false` |
 
 `clientId` must equal the canonical installed app URL from deployment configuration, not an inbound
 Host/forwarded header. Origins must be HTTPS roots without credentials, query or fragment. Each
@@ -45,7 +45,11 @@ reuse a valid cached access token. Invalid refresh grants clear custody. A gener
 replacement/removal: stale devices cannot refresh or remove a newer session. A permanent import
 tombstone prevents old browser credentials from restoring a signed-out session. Retrying a removal
 after a lost response succeeds when no session remains; it cannot remove a different active session. Replacing a
-session forgets its previous grant; owners can revoke older grants from their HA profile.
+session revokes its previous grant (best effort: an unreachable HA keeps the old grant until it is
+removed from the HA profile). Removing the app from the launcher revokes and forgets the session
+through the `beforeRemove` hook, keeping the import tombstone so a reinstall can't resume it from old
+browser tokens; it never blocks removal when HA is down. A request that can't take the session lock
+within 3 s answers 503 `busy` and can be retried.
 
 ## Public HTTPS boundary
 
@@ -78,8 +82,8 @@ the SQL database identity, binding ciphertext to its install. Restore the origin
 and key together. A copied row cannot be decrypted in another install. This protects database-only
 disclosure; a compromised server operator/process with keys can decrypt sessions.
 
-For rotation, add a new key **first**, retaining old keys. Token requests rewrite ciphertext with the
-active key, including cache hits. Do not remove old keys until every retained install and required
+For rotation, add a new key **first**, retaining old keys. Token requests rewrite ciphertext sealed
+with an older key, including on cache hits. Do not remove old keys until every retained install and required
 backup has been migrated or its HA grant revoked and custody removed. Inactive installs do not
 rotate automatically. Lost keys make saved sessions unavailable; revoke their grants in HA and
 reconnect rather than inventing replacement keys. Do not rotate the separate Wasmo password pepper.

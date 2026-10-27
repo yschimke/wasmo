@@ -6,6 +6,7 @@ import okio.Buffer
 import okio.BufferedSink
 import okio.ByteString
 import okio.ByteString.Companion.encodeUtf8
+import wit.wasmo.http.v0_1_0.Header
 
 /** Returns a [ResponseBody] that's a data class appropriate for tests. */
 @Suppress("UNCHECKED_CAST") // Changing the type and type parameter.
@@ -28,3 +29,9 @@ data class ResponseBodySnapshot(
     sink.write(body)
   }
 }
+
+/** The caching headers an installed app's static resource is served with. */
+fun resourceHeaders(body: String, private: Boolean = true) = listOf(
+  Header("Cache-Control", if (private) "private, no-cache" else "no-cache"),
+  Header("ETag", "\"${body.encodeUtf8().sha256().hex().take(32)}\""),
+)

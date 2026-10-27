@@ -14,6 +14,7 @@ import com.wasmo.jobs.OsJobHandler
 import com.wasmo.support.issues.IssueCollector
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Clock
 import wasmo.sql.SqlDatabase
 import wasmox.sql.transaction
@@ -87,6 +88,15 @@ class InstallAppJobHandler(
           id = installedApp.id,
         )
         require(rowCount == 1L)
+      }
+
+      // The new release is active, so older resource copies are unreachable; keep storage flat.
+      try {
+        installer.pruneOtherVersions(installedManifest.version)
+      } catch (e: CancellationException) {
+        throw e
+      } catch (e: Exception) {
+        issueCollector.add("Removing old app versions failed", e)
       }
     } else {
       // TODO: Retry later?

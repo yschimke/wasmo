@@ -15,6 +15,7 @@ import com.wasmo.support.issues.Issue
 import com.wasmo.support.issues.Severity
 import com.wasmo.testing.apps.PublishedApp
 import com.wasmo.testing.framework.ResponseBodySnapshot
+import com.wasmo.testing.framework.resourceHeaders
 import com.wasmo.testing.service.ServiceTester
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
@@ -58,6 +59,7 @@ class InstallAppFromFileSystemTest {
     assertThat(installedApp.call("/"))
       .isEqualTo(
         Response(
+          headers = resourceHeaders("Welcome to the recipes app"),
           contentType = "text/html".toMediaType(),
           body = ResponseBodySnapshot("Welcome to the recipes app"),
         ),
@@ -94,6 +96,7 @@ class InstallAppFromFileSystemTest {
     assertThat(installedApp.call("/media/logo.svg"))
       .isEqualTo(
         Response(
+          headers = resourceHeaders("I am an SVG"),
           contentType = "image/svg+xml".toMediaType(),
           body = ResponseBodySnapshot("I am an SVG"),
         ),
