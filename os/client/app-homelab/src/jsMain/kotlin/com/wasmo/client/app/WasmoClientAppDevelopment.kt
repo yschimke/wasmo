@@ -16,8 +16,11 @@ object DevelopmentEnvironment : Environment {
   override val passkeyUser: String
     get() = "wasmo-development-passkeys"
 
+  // Homelab also serves real domains; only flag the local development host as such.
   override val warningLabel: String?
-    get() = "wasmo.localhost"
+    get() = window.location.hostname
+      .takeIf { it == "wasmo.localhost" || it.endsWith(".wasmo.localhost") }
+      ?.let { "wasmo.localhost" }
 
   override val showSignUp: Boolean
     get() = true

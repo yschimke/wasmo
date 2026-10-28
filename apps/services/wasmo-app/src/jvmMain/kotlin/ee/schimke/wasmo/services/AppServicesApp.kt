@@ -20,21 +20,28 @@ internal constructor(private val platform: Platform, private val sessionKeys: Se
       override suspend fun execute(request: HttpRequest): HttpResponse =
         sql.getOrCreate().use {
           val db = AppServicesDb(it)
-          val sessions = sessionKeys?.let { keys ->
-            platform.publicHttpsService?.let { http ->
-              platform.applicationUrl
-                ?.takeIf { url -> url.startsWith("https://") }
-                ?.let { url ->
-                  HaSessionService(db, keys, http, platform.clock, url)
-                }
-            }
-          }
-          AppServicesHttpService(db, sessions).execute(request)
+          AppServicesHttpService(db, sessions(db)).execute(request)
         }
     }
 
   override suspend fun afterInstall(oldVersion: Long, newVersion: Long) {
     sql.getOrCreate().use { AppServicesDb(it).ensureSchema() }
+  }
+
+  // Removal keeps settings for a reinstall but must not leave the HA grant live.
+  override suspend fun beforeRemove() {
+    sql.getOrCreate().use {
+      val db = AppServicesDb(it)
+      db.ensureSchema()
+      sessions(db)?.revokeForRemoval()
+    }
+  }
+
+  private fun sessions(db: AppServicesDb): HaSessionService? {
+    val keys = sessionKeys ?: return null
+    val http = platform.publicHttpsService ?: return null
+    val url = platform.applicationUrl?.takeIf { it.startsWith("https://") } ?: return null
+    return HaSessionService(db, keys, http, platform.clock, url)
   }
 
   class Factory(private val sessionKeys: SessionKeys? = null) : WasmoApp.Factory {

@@ -66,6 +66,21 @@ class HomelabCommand : CliktCommand() {
     // exposed on a public domain isn't open to anyone signing in as admin.
     val adminPassword = System.getenv("WASMO_ADMIN_PASSWORD")?.takeIf { it.isNotBlank() }
 
+    val passwordPepper = requireNotNull(System.getenv("WASMO_PASSWORD_PEPPER")).decodeHex()
+
+    // Session cookies and email challenge tokens are HMAC-signed with this key, so it must not be a
+    // constant from source. Derive it from the pepper (already a required host secret) unless the
+    // operator sets WASMO_COOKIE_SECRET; changing either signs every session out.
+    val cookieSecret = System.getenv("WASMO_COOKIE_SECRET")?.takeIf { it.isNotBlank() }?.decodeHex()
+      ?: "wasmo-homelab-cookie-secret".encodeUtf8().hmacSha256(passwordPepper)
+
+    // Over HTTPS the session cookie is Secure and hidden from page scripts, so an installed app's
+    // origin can't read the owner's session. Plain HTTP (wasmo.localhost) can't use either flag.
+    val sessionCookieSpec = when {
+      baseUrl.isHttps -> SessionCookieSpec.Https
+      else -> SessionCookieSpec.Http
+    }
+
     val deployment = Deployment(
       baseUrl = baseUrl,
       sendFromEmailAddress = "noreply@wasmo.dev",
@@ -144,7 +159,7 @@ class HomelabCommand : CliktCommand() {
         val homelabGraphFactory = createGraphFactory<HomelabGraph.Factory>()
         val serviceGraph = homelabGraphFactory.create(
           server = server,
-          cookieSecret = CookieSecret("butters".encodeUtf8()),
+          cookieSecret = CookieSecret(cookieSecret),
           appDatabaseSecret = AppDatabaseSecret("rhubarb".encodeUtf8()),
           postmarkCredentials = PostmarkCredentials(
             baseUrl = PostmarkProductionBaseUrl,
@@ -156,15 +171,11 @@ class HomelabCommand : CliktCommand() {
           postgresqlConfig = postgresqlConfig,
           deployment = deployment,
           objectStoreAddress = objectStoreAddress,
-          sessionCookieSpec = SessionCookieSpec.Http,
+          sessionCookieSpec = sessionCookieSpec,
           localPostgresql = localPostgresql,
           logger = logger,
           eventListener = eventListener,
-          hashingPepper = HashingPepper(
-              requireNotNull(
-                System.getenv("WASMO_PASSWORD_PEPPER")
-              ).decodeHex()
-          )
+          hashingPepper = HashingPepper(passwordPepper)
         )
         homelabGraph = serviceGraph
         return serviceGraph.wasmoService

@@ -7,6 +7,7 @@ import com.wasmo.framework.NotFoundUserException
 import com.wasmo.framework.Response
 import com.wasmo.testing.apps.RecipesApp
 import com.wasmo.testing.framework.ResponseBodySnapshot
+import com.wasmo.testing.framework.resourceHeaders
 import com.wasmo.testing.service.ServiceTester
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
@@ -14,10 +15,33 @@ import kotlinx.coroutines.test.runTest
 import okhttp3.MediaType.Companion.toMediaType
 import okio.ByteString.Companion.encodeUtf8
 import wasmo.objectstore.PutObjectRequest
+import wit.wasmo.http.v0_1_0.Header
 
 class InstalledAppHttpServiceTest {
   @InterceptTest
   val tester = ServiceTester()
+
+  @Test
+  fun unchangedResourceRevalidatesWithoutABody() = runTest {
+    val app = tester.sampleApps.recipes.publishedApp.copy(
+      resources = tester.sampleApps.recipes.publishedApp.resources + mapOf(
+        "www/app.wasm" to "large module".encodeUtf8(),
+      ),
+    )
+    tester.publishApp(app)
+    val owner = tester.newClient()
+    val installedApp = owner.createComputer().installApp(app)
+    val url = installedApp.url.resolve("/app.wasm")!!
+    val etag = resourceHeaders("large module", private = true)[1].value
+
+    val revalidated = owner.call().callApp(url = url, headers = listOf(Header("If-None-Match", etag)))
+    assertThat(revalidated.status).isEqualTo(304)
+    assertThat(revalidated.body).isEqualTo(ResponseBodySnapshot(""))
+
+    val changed = owner.call().callApp(url = url, headers = listOf(Header("If-None-Match", "\"old\"")))
+    assertThat(changed.status).isEqualTo(200)
+    assertThat(changed.body).isEqualTo(ResponseBodySnapshot("large module"))
+  }
 
   @Test
   fun resourceInWww() = runTest {
@@ -35,6 +59,7 @@ class InstalledAppHttpServiceTest {
     assertThat(owner.call().callApp(url = installedApp.url.resolve("/resource1.txt")!!))
       .isEqualTo(
         Response(
+          headers = resourceHeaders("This is a resource in www", private = true),
           contentType = "text/plain".toMediaType(),
           body = ResponseBodySnapshot("This is a resource in www"),
         ),
@@ -62,6 +87,7 @@ class InstalledAppHttpServiceTest {
     assertThat(owner.call().callApp(url = installedApp.url.resolve("/resource1.txt")!!))
       .isEqualTo(
         Response(
+          headers = resourceHeaders("This is a resource in www-public", private = false),
           contentType = "text/plain".toMediaType(),
           body = ResponseBodySnapshot("This is a resource in www-public"),
         ),
@@ -71,6 +97,7 @@ class InstalledAppHttpServiceTest {
     assertThat(anotherUser.call().callApp(url = installedApp.url.resolve("/resource1.txt")!!))
       .isEqualTo(
         Response(
+          headers = resourceHeaders("This is a resource in www-public", private = false),
           contentType = "text/plain".toMediaType(),
           body = ResponseBodySnapshot("This is a resource in www-public"),
         ),
@@ -94,6 +121,7 @@ class InstalledAppHttpServiceTest {
     assertThat(installedApp.call("/resource1.txt"))
       .isEqualTo(
         Response(
+          headers = resourceHeaders("This is a resource in www-public", private = false),
           contentType = "text/plain".toMediaType(),
           body = ResponseBodySnapshot("This is a resource in www-public"),
         ),
@@ -250,6 +278,7 @@ class InstalledAppHttpServiceTest {
     assertThat(installedApp.call("/"))
       .isEqualTo(
         Response(
+          headers = resourceHeaders("This is the default resource"),
           contentType = "text/html".toMediaType(),
           body = ResponseBodySnapshot("This is the default resource"),
         ),
@@ -258,6 +287,7 @@ class InstalledAppHttpServiceTest {
     assertThat(installedApp.call("/hello/"))
       .isEqualTo(
         Response(
+          headers = resourceHeaders("This is the default resource for hello/"),
           contentType = "text/html".toMediaType(),
           body = ResponseBodySnapshot("This is the default resource for hello/"),
         ),

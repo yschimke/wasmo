@@ -27,7 +27,26 @@ class RealClientAuthenticator(
       ?.let { sessionCookieEncoder.decode(it) }
       ?: newSessionCookie()
     userAgent.append(cookie)
+    expireLegacyHttpCookie()
     return cookie
+  }
+
+  /**
+   * A deployment that moved from [SessionCookieSpec.Http] to HTTPS leaves the old script-readable
+   * cookie in browsers. The server no longer reads it, but expire it so app origins can't either.
+   */
+  private fun expireLegacyHttpCookie() {
+    val legacyName = SessionCookieSpec.Http.cookieName
+    if (sessionCookieSpec == SessionCookieSpec.Http || userAgent.getCookie(legacyName) == null) return
+    userAgent.setCookie(
+      name = legacyName,
+      value = "",
+      secure = true,
+      httpOnly = true,
+      domain = ".${deployment.baseUrl.host}",
+      path = "/",
+      maxAgeSeconds = 0L,
+    )
   }
 
   /** Replace the customer's cookie with a new one. */

@@ -65,6 +65,32 @@ class ZipResourceInstallerTest {
   }
 
   @Test
+  fun pruneKeepsOnlyTheActiveVersion() = runTest {
+    for (version in listOf(9L, 10L, 1L)) {
+      httpService[url] = buildZip {
+        put(AppManifest(version = version, target = TargetSdk1))
+        put("www/index.html", "v$version".encodeUtf8())
+      }
+      with(IssueCollector()) { installer.install() }
+    }
+    val otherApp = ZipResourceInstaller(
+      computerObjectStore = objectStore,
+      wasmoFileAddress = wasmoFileAddress,
+      httpService = httpService,
+      appSlug = AppSlug("music2"),
+    )
+    with(IssueCollector()) { otherApp.install() }
+
+    installer.pruneOtherVersions(1L)
+
+    assertThat(objectStore["music/resources/v1/www/index.html"]).isEqualTo("v1".encodeUtf8())
+    assertThat(objectStore["music/resources/v9/www/index.html"]).isNull()
+    assertThat(objectStore["music/resources/v10/www/index.html"]).isNull()
+    // Another app whose slug shares the prefix is untouched.
+    assertThat(objectStore["music2/resources/v1/www/index.html"]).isEqualTo("v1".encodeUtf8())
+  }
+
+  @Test
   fun skipsDirectoryEntries() = runTest {
     val manifest = AppManifest(
       version = 1L,

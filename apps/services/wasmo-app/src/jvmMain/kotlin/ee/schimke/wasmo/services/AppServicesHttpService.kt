@@ -8,6 +8,7 @@ import okio.ByteString.Companion.encodeUtf8
 import wasmo.http.HttpResponse
 import wasmo.http.HttpService
 import wasmo.http.contentType
+import wasmo.sql.SqlException
 import wit.wasmo.http.v0_1_0.Header
 import wit.wasmo.http.v0_1_0.HttpRequest
 import wit.wasmo.http.v0_1_0.HttpResponse as Response
@@ -100,6 +101,10 @@ internal constructor(
         }
         else -> error(404U, "not-found")
       }
+    } catch (e: SqlException) {
+      // Another request holds the session row (e.g. a slow HA refresh); the client retries.
+      if (e.error.sqlState == LOCK_NOT_AVAILABLE) return error(503U, "busy")
+      throw e
     } catch (_: AppServicesDb.AlreadyInitialized) {
       return error(409U, "already-initialized")
     } catch (_: AppServicesDb.NewerSchema) {
@@ -125,6 +130,7 @@ internal constructor(
 
   companion object {
     private const val BASE = "/api/wasmo/v1/"
+    private const val LOCK_NOT_AVAILABLE = "55P03"
     private val KEY = Regex("[a-z0-9][a-z0-9._-]{0,63}")
   }
 }

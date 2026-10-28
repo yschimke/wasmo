@@ -44,14 +44,14 @@ class RealInstalledAppHttpService(
     val publicObject = loadObjectOrNull(urlPath, "www-public")
     if (publicObject != null) return publicObject
 
-    val publicResource = loadResourceOrNull(urlPath, "www-public")
+    val publicResource = loadResourceOrNull(request, urlPath, "www-public")
     if (publicResource != null) return publicResource
 
     if (caller.computerAccess == ComputerAccess.Owner) {
       val privateObject = loadObjectOrNull(urlPath, "www")
       if (privateObject != null) return privateObject
 
-      val privateResource = loadResourceOrNull(urlPath, "www")
+      val privateResource = loadResourceOrNull(request, urlPath, "www")
       if (privateResource != null) return privateResource
 
       // TODO: pass the computerAccess to the HTTP service.
@@ -63,6 +63,7 @@ class RealInstalledAppHttpService(
   }
 
   private suspend fun loadResourceOrNull(
+    request: Request,
     urlPath: String,
     prefix: String,
   ): Response<ResponseBody>? {
@@ -70,8 +71,23 @@ class RealInstalledAppHttpService(
     val privateResource = resourceLoader.loadOrNull("/$prefix$urlPath")
       ?: return null
 
+    // Resources only change when the app is upgraded, but their names don't carry the version, so
+    // let browsers keep them and revalidate each use: an unchanged multi-MB .wasm is then a 304.
+    val etag = "\"${privateResource.sha256().hex().take(32)}\""
+    val headers = listOf(
+      PlatformHeader("Cache-Control", if (prefix == "www") "private, no-cache" else "no-cache"),
+      PlatformHeader("ETag", etag),
+    )
+    val ifNoneMatch = request.headers
+      .filter { it.name.equals("If-None-Match", ignoreCase = true) }
+      .flatMap { it.value.split(',') }
+      .map { it.trim().removePrefix("W/") }
+    if (etag in ifNoneMatch) {
+      return Response(status = 304, headers = headers, body = ResponseBody {})
+    }
+
     return Response(
-      headers = listOf(),
+      headers = headers,
       contentType = contentTypeDatabase[urlPath],
       body = ResponseBody {
         it.write(privateResource)

@@ -15,6 +15,7 @@ import com.wasmo.framework.UserAgent
 import com.wasmo.framework.UserException
 import com.wasmo.framework.asResponse
 import com.wasmo.framework.decodeUrl
+import com.wasmo.framework.requireSameOrigin
 import com.wasmo.identifiers.Deployment
 import com.wasmo.identifiers.OsScope
 import dev.zacsweers.metro.Inject
@@ -104,6 +105,8 @@ internal class RealActionRouter(
   @Suppress("UNCHECKED_CAST") // Checked dynamically.
   private fun <S, R> Route.registerRpc(actionRegistration: ActionRegistration.Rpc<S, R>) {
     handleInternal(actionRegistration) { userAgent, wasmoUrl, call ->
+      // RPCs change account and computer state; the client only ever POSTs them same-origin.
+      requireSameOrigin(wasmoUrl, call.request.headers["Origin"])
       val request = actionRegistration.requestAdapter.decode(call.request)
       val action = callGraph(userAgent).rpcActions[actionRegistration.action]?.invoke()
         ?: error("unknown action: ${actionRegistration.action}, did you forget @ContributesIntoMap?")

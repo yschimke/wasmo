@@ -9,6 +9,10 @@ interface ResourceInstaller {
   context(issueCollector: IssueCollector)
   suspend fun install(): AppManifest?
 
+  /** Deletes resources from versions other than [keepVersion], once that version is active. */
+  suspend fun pruneOtherVersions(keepVersion: Long) {
+  }
+
   interface Factory {
     fun create(
       appSlug: AppSlug,
