@@ -18,6 +18,7 @@ class AppServicesHttpService
 internal constructor(
   private val db: AppServicesDb,
   private val sessions: HaSessionService? = null,
+  private val pocketCasts: PocketCastsService? = null,
 ) : HttpService {
   override suspend fun execute(request: HttpRequest): Response {
     val path =
@@ -63,10 +64,25 @@ internal constructor(
           return error(400U, "invalid-ha-destination")
         }
       }
+      if (route.startsWith("pocketcasts/")) {
+        val handler = pocketCasts ?: return error(404U, "pocketcasts-unavailable")
+        if (request.method != "GET") {
+          if (request.contentType?.substringBefore(';')?.trim() != "application/json")
+            return error(415U, "json-required")
+          if (!boundedJsonDepth(request.body?.utf8() ?: "{}")) return error(400U, "json-too-deep")
+        }
+        try {
+          return handler.execute(route, request)
+        } catch (failure: PocketCastsService.Failure) {
+          return error(failure.status, failure.code)
+        } catch (_: java.io.IOException) {
+          return error(502U, "pocketcasts-unavailable")
+        }
+      }
       return when {
         route == "capabilities" && request.method == "GET" ->
           json(
-            """{"api":1,"backend":"wasmo-app-services","kv":true,"kvImport":true,"haSession":${sessions != null},"publish":false}"""
+            """{"api":1,"backend":"wasmo-app-services","kv":true,"kvImport":true,"haSession":${sessions != null},"pocketCasts":${pocketCasts != null},"publish":false}"""
           )
         route == "kv" && request.method == "GET" -> json(db.read().toString())
         isImport || (route.startsWith("kv/") && request.method == "PUT") -> {

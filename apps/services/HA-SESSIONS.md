@@ -55,7 +55,8 @@ within 3 s answers 503 `busy` and can be retried.
 
 The existing `Platform.httpService` follows redirects and is retained for compatibility. The new
 optional `Platform.publicHttpsService` uses an independent client: HTTPS only, no URL userinfo,
-no redirects/retries/proxies/cookies, a 10-second call deadline, and 64 KiB request/response bounds.
+no redirects/retries/proxies/cookies, a 10-second call deadline, a 64 KiB request bound and a 2 MiB response bound (raised from 64 KiB
+for [Pocket Casts](POCKET-CASTS.md) lists).
 Its DNS hook rejects every response containing private, loopback, link-local, shared, multicast,
 documentation or conservative special-purpose addresses, including cloud metadata targets and
 IPv6 transition ranges. OkHttp connects to those checked addresses without a second DNS lookup;

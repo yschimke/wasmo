@@ -167,7 +167,7 @@ class AppServicesAppTest {
     withApp { app, platform ->
       assertEquals(200U, app.request("kv").code)
       platform.sqlService.getOrCreate().newConnection().use {
-        it.execute("UPDATE wasmo_services_schema SET version = 3")
+        it.execute("UPDATE wasmo_services_schema SET version = 4")
       }
       assertEquals(503U, app.request("kv").code)
       assertEquals(503U, app.request("kv/key", "PUT", "true").code)
@@ -180,10 +180,12 @@ class AppServicesAppTest {
       val response = app.request("capabilities")
       val caps = Json.parseToJsonElement(response.body.utf8()).jsonObject
       assertEquals("false", caps["haSession"]!!.jsonPrimitive.content)
+      assertEquals("false", caps["pocketCasts"]!!.jsonPrimitive.content)
       assertEquals("false", caps["publish"]!!.jsonPrimitive.content)
       assertTrue(response.headers.any { it.name == "Cache-Control" && it.value == "no-store" })
       assertFalse(response.headers.any { it.name.startsWith("Access-Control-") })
       assertEquals(404U, app.request("ha/session").code)
+      assertEquals(404U, app.request("pocketcasts/session").code)
       assertEquals(404U, app.request("publish").code)
     }
   }

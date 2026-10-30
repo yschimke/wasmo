@@ -22,7 +22,7 @@ internal class AppServicesDb(private val database: SqlDatabase) {
         .use {
           checkNotNull(it.next()).getS32(0)!!
         }
-    if (version > 2) throw NewerSchema()
+    if (version > 3) throw NewerSchema()
     if (version == 0) {
       connection.execute(
         "CREATE TABLE wasmo_services_kv (key TEXT PRIMARY KEY, value TEXT NOT NULL)"
@@ -35,6 +35,13 @@ internal class AppServicesDb(private val database: SqlDatabase) {
       )
       connection.execute("INSERT INTO wasmo_services_ha VALUES (1, FALSE, '', NULL)")
       connection.execute("UPDATE wasmo_services_schema SET version = 2 WHERE singleton = 1")
+    }
+    if (version < 3) {
+      connection.execute(
+        "CREATE TABLE wasmo_services_pocketcasts (singleton INTEGER PRIMARY KEY CHECK (singleton = 1), sealed TEXT)"
+      )
+      connection.execute("INSERT INTO wasmo_services_pocketcasts VALUES (1, NULL)")
+      connection.execute("UPDATE wasmo_services_schema SET version = 3 WHERE singleton = 1")
     }
   }
 
