@@ -18,7 +18,7 @@ not execution of an archive's `app.wasm`.
 All endpoints are under `/api/wasmo/v1/` and require the Wasmo owner session. The platform guards
 access before calling app code; the app must never add public objects over the API namespace.
 
-- `GET capabilities`: API 1, `kv: true`, `haSession` and `pocketCasts` enabled only with private session configuration, `publish: false`.
+- `GET capabilities`: API 1, `kv: true`, `haSession` and `pocketCasts` enabled only with private session configuration, `proxies` with each declared proxy's approval, `publish: false`.
 - `GET kv`: all saved JSON values, keyed by setting name.
 - `PUT kv/{key}`: any JSON value, including JSON null; requires `Content-Type: application/json`.
 - `DELETE kv/{key}`: idempotently removes a setting.
@@ -107,3 +107,5 @@ newer-schema refusal and disabled credential/publication capabilities.
 The owner selected owner-supplied public HTTPS HA origins. See [HA-SESSIONS.md](HA-SESSIONS.md) for the optional session API, outbound safeguards, encryption and rollout limits. No public card data is exposed.
 
 [POCKET-CASTS.md](POCKET-CASTS.md) adds a private Pocket Casts sign-in with a fixed set of read calls, for browser apps that Pocket Casts' API refuses cross-origin.
+
+[WEB-PROXY.md](WEB-PROXY.md) lets an app declare `[[proxy]]` origins and routes in its manifest, forwarded only once the operator approves each origin with `WASMO_APP_PROXIES`.

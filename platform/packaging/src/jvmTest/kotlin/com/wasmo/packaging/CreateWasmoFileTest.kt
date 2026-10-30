@@ -74,6 +74,7 @@ class CreateWasmoFileTest {
         |target = "https://wasmo.com/sdk/1"
         |version = 35
         |external_resource = [  ]
+        |proxy = [  ]
         """.trimMargin(),
       )
     assertThat(output.read("/www/index.html".toPath()) { readUtf8() })

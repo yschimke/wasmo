@@ -19,6 +19,7 @@ internal constructor(
   private val db: AppServicesDb,
   private val sessions: HaSessionService? = null,
   private val pocketCasts: PocketCastsService? = null,
+  private val webProxy: WebProxyService? = null,
 ) : HttpService {
   override suspend fun execute(request: HttpRequest): Response {
     val path =
@@ -37,6 +38,15 @@ internal constructor(
         }
     )
       return error(403U, "csrf")
+    if (path.startsWith(WebProxyService.PREFIX)) {
+      val handler = webProxy ?: return error(404U, "proxy-unavailable")
+      if ((request.body?.size ?: 0) > AppServicesDb.VALUE_BYTES) return error(413U, "too-large")
+      return try {
+        handler.execute(request)
+      } catch (failure: WebProxyService.Failure) {
+        error(failure.status, failure.code)
+      }
+    }
     val isImport = path == "${BASE}kv/import" && request.method == "POST"
     val bodyLimit = if (isImport) AppServicesDb.TOTAL_BYTES else AppServicesDb.VALUE_BYTES
     if ((request.body?.size ?: 0) > bodyLimit) return error(413U, "too-large")
@@ -82,7 +92,7 @@ internal constructor(
       return when {
         route == "capabilities" && request.method == "GET" ->
           json(
-            """{"api":1,"backend":"wasmo-app-services","kv":true,"kvImport":true,"haSession":${sessions != null},"pocketCasts":${pocketCasts != null},"publish":false}"""
+            """{"api":1,"backend":"wasmo-app-services","kv":true,"kvImport":true,"haSession":${sessions != null},"pocketCasts":${pocketCasts != null},"proxies":${webProxy?.capabilities() ?: "{}"},"publish":false}"""
           )
         route == "kv" && request.method == "GET" -> json(db.read().toString())
         isImport || (route.startsWith("kv/") && request.method == "PUT") -> {

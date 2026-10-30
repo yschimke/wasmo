@@ -14,6 +14,8 @@ interface Platform {
   val publicHttpsService: HttpService? get() = null
   /** Canonical installed app root URL from deployment configuration, never a forwarded Host. */
   val applicationUrl: String? get() = null
+  /** Proxies the active release's manifest declares. Empty on older hosts. */
+  suspend fun webProxies(): List<WebProxy> = listOf()
   val objectStore: ObjectStore
   val downloader: Downloader
   val sqlService: SqlService
