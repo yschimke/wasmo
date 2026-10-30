@@ -10,6 +10,7 @@ import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
 import kotlin.time.Clock
 import wasmo.app.Platform
+import wasmo.app.WebProxy
 import wasmo.downloader.Downloader
 import wasmo.http.HttpService
 import wasmo.jobs.JobQueue
@@ -29,8 +30,19 @@ class RealPlatform(
   deployment: Deployment,
   appSlug: AppSlug,
   computerSlug: ComputerSlug,
+  private val appManifestLoader: AppManifestLoader,
 ) : Platform {
   override val applicationUrl: String = deployment.baseUrl.newBuilder()
     .host("$appSlug-$computerSlug.${deployment.baseUrl.host}")
     .encodedPath("/").query(null).fragment(null).build().toString()
+
+  override suspend fun webProxies(): List<WebProxy> =
+    appManifestLoader.load().proxy.map { proxy ->
+      WebProxy(
+        name = proxy.name,
+        origin = proxy.origin,
+        requestHeaders = proxy.request_headers,
+        routes = proxy.route.map { WebProxy.Route(it.method, it.path) },
+      )
+    }
 }

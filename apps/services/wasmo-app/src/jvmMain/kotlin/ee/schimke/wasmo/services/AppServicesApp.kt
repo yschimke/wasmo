@@ -8,8 +8,11 @@ import wit.wasmo.http.v0_1_0.HttpRequest
 import wit.wasmo.http.v0_1_0.HttpResponse
 
 class AppServicesApp
-internal constructor(private val platform: Platform, private val sessionKeys: SessionKeys?) :
-  WasmoApp() {
+internal constructor(
+  private val platform: Platform,
+  private val sessionKeys: SessionKeys?,
+  private val proxyOrigins: Set<String>,
+) : WasmoApp() {
   private val sql: SqlService
     get() = platform.sqlService
 
@@ -20,7 +23,7 @@ internal constructor(private val platform: Platform, private val sessionKeys: Se
       override suspend fun execute(request: HttpRequest): HttpResponse =
         sql.getOrCreate().use {
           val db = AppServicesDb(it)
-          AppServicesHttpService(db, sessions(db), pocketCasts(db)).execute(request)
+          AppServicesHttpService(db, sessions(db), pocketCasts(db), webProxy()).execute(request)
         }
     }
 
@@ -52,8 +55,17 @@ internal constructor(private val platform: Platform, private val sessionKeys: Se
     return PocketCastsService(db, keys, http, platform.clock)
   }
 
-  class Factory(private val sessionKeys: SessionKeys? = null) : WasmoApp.Factory {
+  private suspend fun webProxy(): WebProxyService? {
+    val http = platform.publicHttpsService ?: return null
+    return WebProxyService(http, platform.webProxies(), proxyOrigins)
+  }
+
+  /** [proxyOrigins] are the operator's approvals for this install; see [appProxies]. */
+  class Factory(
+    private val sessionKeys: SessionKeys? = null,
+    private val proxyOrigins: Set<String> = setOf(),
+  ) : WasmoApp.Factory {
     override suspend fun create(platform: Platform): AppServicesApp =
-      AppServicesApp(platform, sessionKeys)
+      AppServicesApp(platform, sessionKeys, proxyOrigins)
   }
 }

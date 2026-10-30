@@ -35,6 +35,8 @@ particular deployment — the public URL, secrets and DNS name are all supplied 
   registers shared owner settings services for an operator-approved list of installed apps. The default is empty; other apps and deployments are unchanged.
   This is a temporary bridge until Wasmo can execute third-party app components. See
   [the staged implementation](apps/services/README.md). It does not package browser assets.
+  `WASMO_APP_PROXIES=cadence=https://api.example.com,…` approves origins that an install's manifest
+  declares as [web proxies](apps/services/WEB-PROXY.md); the default approves none.
 
 - **Remove installed apps** — each launcher entry has a Remove button showing its install name.
   Confirmation disables that installation, its app URL, and delivery of queued app jobs. Stored files and SQL data are retained;

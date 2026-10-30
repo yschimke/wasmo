@@ -55,6 +55,70 @@ class AppManifestChecker(
         check(launcher)
       }
     }
+
+    for ((index, proxy) in manifest.proxy.withIndex()) {
+      context(issueCollector.href("proxy[$index]")) {
+        check(proxy)
+      }
+    }
+    context(issueCollector.href("proxy")) {
+      val names = manifest.proxy.map { it.name }
+      issueCheck(names.size == names.toSet().size) {
+        "proxy names must be unique"
+      }
+    }
+  }
+
+  context(issueCollector: IssueCollector)
+  private fun check(proxy: Proxy) {
+    context(issueCollector.href("name")) {
+      issueCheck(ProxyName.matches(proxy.name)) {
+        "name must match ${ProxyName.pattern}"
+      }
+    }
+
+    context(issueCollector.href("origin")) {
+      issueCheck(ProxyOrigin.matches(proxy.origin)) {
+        "origin must be https://host or https://host:port, with no path"
+      }
+    }
+
+    for ((index, header) in proxy.request_headers.withIndex()) {
+      context(issueCollector.href("request_headers[$index]")) {
+        issueCheck(HeaderName.matches(header)) {
+          "invalid header name '$header'"
+        }
+        issueCheck(header.lowercase() !in UnforwardableHeaders) {
+          "header '$header' can't be forwarded"
+        }
+      }
+    }
+
+    context(issueCollector.href("route")) {
+      issueCheck(proxy.route.isNotEmpty()) {
+        "a proxy must declare at least one route"
+      }
+    }
+    for ((index, route) in proxy.route.withIndex()) {
+      context(issueCollector.href("route[$index]")) {
+        check(route)
+      }
+    }
+  }
+
+  context(issueCollector: IssueCollector)
+  private fun check(route: ProxyRoute) {
+    context(issueCollector.href("method")) {
+      issueCheck(route.method in ProxyMethods) {
+        "method must be one of $ProxyMethods"
+      }
+    }
+    context(issueCollector.href("path")) {
+      checkPath(path = route.path, allowTrailingWildcard = true)
+      issueCheck(route.path.split("/").none { it == "." || it == ".." }) {
+        "path must not contain '.' or '..' segments"
+      }
+    }
   }
 
   context(issueCollector: IssueCollector)
@@ -134,4 +198,16 @@ internal val SupportedTargets = setOf(TargetSdk1)
 internal val SupportedAccessValues = setOf(
   "public",
   "private",
+)
+
+internal val ProxyName = Regex("[a-z][a-z0-9-]{0,31}")
+internal val ProxyOrigin = Regex("https://[a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+(:[1-9][0-9]{0,4})?")
+internal val ProxyMethods = setOf("GET", "HEAD", "POST", "PUT", "PATCH", "DELETE")
+private val HeaderName = Regex("[A-Za-z0-9][A-Za-z0-9-]{0,63}")
+// The host sets these itself, or they would let an app speak for the owner's browser.
+internal val UnforwardableHeaders = setOf(
+  "connection", "content-length", "cookie", "expect", "forwarded", "host", "keep-alive", "origin",
+  "proxy-authorization", "proxy-connection", "referer", "te", "trailer", "transfer-encoding",
+  "upgrade", "x-forwarded-for", "x-forwarded-host", "x-forwarded-proto", "x-real-ip",
+  "x-wasmo-api",
 )
