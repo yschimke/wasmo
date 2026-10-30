@@ -8,12 +8,12 @@ import javax.crypto.spec.SecretKeySpec
 
 /** First key encrypts, all configured keys decrypt, allowing a staged lazy rotation. */
 class SessionKeys private constructor(private val keys: Map<String, SecretKeySpec>) {
-  internal fun seal(context: String, value: String): String {
+  internal fun seal(context: String, value: String, purpose: String = HA_PURPOSE): String {
     val nonce = ByteArray(12).also { SecureRandom().nextBytes(it) }
     val (id, key) = keys.entries.first()
     val cipher = Cipher.getInstance("AES/GCM/NoPadding")
     cipher.init(Cipher.ENCRYPT_MODE, key, GCMParameterSpec(128, nonce))
-    cipher.updateAAD("wasmo-ha-session-v1\u0000$context".toByteArray(Charsets.UTF_8))
+    cipher.updateAAD("$purpose\u0000$context".toByteArray(Charsets.UTF_8))
     val bytes = cipher.doFinal(value.toByteArray(Charsets.UTF_8))
     return "$id.${Base64.getEncoder().encodeToString(nonce)}.${Base64.getEncoder().encodeToString(bytes)}"
   }
@@ -21,7 +21,7 @@ class SessionKeys private constructor(private val keys: Map<String, SecretKeySpe
   /** True if [value] was sealed with the key [seal] uses now. */
   internal fun isActive(value: String): Boolean = value.substringBefore('.') == keys.keys.first()
 
-  internal fun open(context: String, value: String): String {
+  internal fun open(context: String, value: String, purpose: String = HA_PURPOSE): String {
     val parts = value.split('.')
     require(parts.size == 3)
     val key = requireNotNull(keys[parts[0]])
@@ -29,11 +29,14 @@ class SessionKeys private constructor(private val keys: Map<String, SecretKeySpe
     require(nonce.size == 12)
     val cipher = Cipher.getInstance("AES/GCM/NoPadding")
     cipher.init(Cipher.DECRYPT_MODE, key, GCMParameterSpec(128, nonce))
-    cipher.updateAAD("wasmo-ha-session-v1\u0000$context".toByteArray(Charsets.UTF_8))
+    cipher.updateAAD("$purpose\u0000$context".toByteArray(Charsets.UTF_8))
     return cipher.doFinal(Base64.getDecoder().decode(parts[2])).toString(Charsets.UTF_8)
   }
 
   companion object {
+    // Each custody kind seals under its own purpose, so one ciphertext can't stand in for another.
+    private const val HA_PURPOSE = "wasmo-ha-session-v1"
+
     fun parse(value: String?): SessionKeys? {
       if (value.isNullOrBlank()) return null
       // Configuration errors never include the operator's value in the exception.

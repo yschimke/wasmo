@@ -20,7 +20,7 @@ internal constructor(private val platform: Platform, private val sessionKeys: Se
       override suspend fun execute(request: HttpRequest): HttpResponse =
         sql.getOrCreate().use {
           val db = AppServicesDb(it)
-          AppServicesHttpService(db, sessions(db)).execute(request)
+          AppServicesHttpService(db, sessions(db), pocketCasts(db)).execute(request)
         }
     }
 
@@ -28,12 +28,14 @@ internal constructor(private val platform: Platform, private val sessionKeys: Se
     sql.getOrCreate().use { AppServicesDb(it).ensureSchema() }
   }
 
-  // Removal keeps settings for a reinstall but must not leave the HA grant live.
+  // Removal keeps settings for a reinstall but must not leave the HA grant or Pocket Casts
+  // sign-in behind.
   override suspend fun beforeRemove() {
     sql.getOrCreate().use {
       val db = AppServicesDb(it)
       db.ensureSchema()
       sessions(db)?.revokeForRemoval()
+      pocketCasts(db)?.forgetForRemoval()
     }
   }
 
@@ -42,6 +44,12 @@ internal constructor(private val platform: Platform, private val sessionKeys: Se
     val http = platform.publicHttpsService ?: return null
     val url = platform.applicationUrl?.takeIf { it.startsWith("https://") } ?: return null
     return HaSessionService(db, keys, http, platform.clock, url)
+  }
+
+  private fun pocketCasts(db: AppServicesDb): PocketCastsService? {
+    val keys = sessionKeys ?: return null
+    val http = platform.publicHttpsService ?: return null
+    return PocketCastsService(db, keys, http, platform.clock)
   }
 
   class Factory(private val sessionKeys: SessionKeys? = null) : WasmoApp.Factory {

@@ -18,12 +18,12 @@ import wit.wasmo.http.v0_1_0.HttpResponse
 @Inject
 @SingleIn(OsScope::class)
 class PublicHttpsHttpService : HttpService {
-  private val delegate = OkHttpClientHttpService(publicHttpsClient(), MAX_BYTES)
+  private val delegate = OkHttpClientHttpService(publicHttpsClient(), MAX_RESPONSE_BYTES)
 
   override suspend fun execute(request: HttpRequest): HttpResponse {
     val url = request.httpUrl
     require(url.isHttps && url.username.isEmpty() && url.password.isEmpty() && url.fragment == null)
-    require((request.body?.size ?: 0) <= MAX_BYTES)
+    require((request.body?.size ?: 0) <= MAX_REQUEST_BYTES)
     // IP literals bypass OkHttp's DNS hook, so check them before creating the call too.
     if (url.host.contains(':') || url.host.all { it.isDigit() || it == '.' }) {
       require(isPublicAddress(InetAddress.getByName(url.host)))
@@ -32,7 +32,9 @@ class PublicHttpsHttpService : HttpService {
   }
 
   companion object {
-    private const val MAX_BYTES = 64 * 1024L
+    private const val MAX_REQUEST_BYTES = 64 * 1024L
+    // Pocket Casts lists (Up Next with its episode sync, in-progress episodes) outgrow 64 KiB.
+    private const val MAX_RESPONSE_BYTES = 2 * 1024 * 1024L
   }
 }
 
