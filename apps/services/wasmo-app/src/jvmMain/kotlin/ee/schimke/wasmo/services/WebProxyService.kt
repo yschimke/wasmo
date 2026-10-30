@@ -70,7 +70,10 @@ internal class WebProxyService(
     return HttpResponse(
       code = response.code,
       headers =
-        response.headers.filter { it.name.lowercase() in RETURNED } +
+        // The HTTP client re-adds Content-Type from the body, so the origin's copy can repeat.
+        response.headers
+          .filter { it.name.lowercase() in RETURNED }
+          .distinctBy { it.name.lowercase() } +
           listOf(
             Header("Cache-Control", "no-store"),
             Header("X-Content-Type-Options", "nosniff"),

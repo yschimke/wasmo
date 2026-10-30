@@ -37,6 +37,7 @@ class WebProxyServiceTest {
               code = 200U,
               headers =
                 listOf(
+                  Header("content-type", "text/html"),
                   Header("Content-Type", "text/html"),
                   Header("Set-Cookie", "upstream=1"),
                   Header("Location", "https://elsewhere.example/"),
@@ -102,6 +103,7 @@ class WebProxyServiceTest {
       // Upstream cookies and redirects don't reach the app's origin, and the body can't run there.
       val names = response.headers.map { it.name.lowercase() }
       assertTrue("set-cookie" !in names && "location" !in names)
+      assertEquals(1, names.count { it == "content-type" })
       assertEquals(
         "sandbox; default-src 'none'",
         response.headers.single { it.name == "Content-Security-Policy" }.value,
